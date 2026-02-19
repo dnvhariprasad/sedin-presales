@@ -45,3 +45,4 @@ build/
 out/
 *.log
 npm-debug.log*
+*.lic
