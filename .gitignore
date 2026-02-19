@@ -1,0 +1,47 @@
+# .NET
+**/bin/
+**/obj/
+**/*.user
+**/*.suo
+**/*.userprefs
+*.nupkg
+.vs/
+
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.settings/
+.project
+.classpath
+.mvn/wrapper/maven-wrapper.jar
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Azure
+infra/output/
+
+# Build
+build/
+out/
+*.log
+npm-debug.log*

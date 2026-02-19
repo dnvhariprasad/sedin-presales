@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/presalesdb
+    username: presalesadmin
+    password: presalesadmin
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  flyway:
+    enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/common/v2.0
+
+logging:
+  level:
+    com.sedin.presales: DEBUG
+    org.springframework.security: DEBUG
