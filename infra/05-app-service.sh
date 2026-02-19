@@ -10,7 +10,7 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 RESOURCE_GROUP="rg-sedin-presales"
-LOCATION="eastus"
+LOCATION="centralus"  # eastus has zero VM quota
 
 ASP_NAME="asp-sedin-presales"
 ASP_SKU="B1"

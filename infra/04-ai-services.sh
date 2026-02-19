@@ -77,7 +77,7 @@ else
         --model-version "2024-07-18" \
         --model-format "OpenAI" \
         --sku-capacity 30 \
-        --sku-name "Standard"
+        --sku-name "GlobalStandard"
     ok "Model '$AOAI_MODEL_CHAT' deployed."
 fi
 
@@ -98,7 +98,7 @@ else
         --model-version "1" \
         --model-format "OpenAI" \
         --sku-capacity 30 \
-        --sku-name "Standard"
+        --sku-name "GlobalStandard"
     ok "Model '$AOAI_MODEL_EMBED' deployed."
 fi
 

@@ -1,0 +1,16 @@
+package com.sedin.presales.domain.repository;
+
+import com.sedin.presales.domain.entity.DocumentType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface DocumentTypeRepository extends JpaRepository<DocumentType, UUID> {
+
+    List<DocumentType> findByIsActiveTrue();
+
+    List<DocumentType> findByNameContainingIgnoreCase(String name);
+}

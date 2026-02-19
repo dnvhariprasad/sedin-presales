@@ -9,7 +9,7 @@ set -euo pipefail
 # Configuration
 # ---------------------------------------------------------------------------
 RESOURCE_GROUP="rg-sedin-presales"
-LOCATION="eastus"
+LOCATION="centralus"  # eastus restricts PostgreSQL Flexible Server provisioning
 SERVER_NAME="psql-sedin-presales"
 SKU="Standard_B1ms"
 TIER="Burstable"
