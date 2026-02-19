@@ -61,14 +61,20 @@ mvn -B clean compile -f src/backend/pom.xml
 # Run API locally (dev profile: ddl-auto=update, flyway disabled)
 mvn -B spring-boot:run -Dspring-boot.run.profiles=dev -f src/backend/pom.xml
 
-# Run tests
-mvn -B verify -f src/backend/pom.xml
+# Run all tests (96 tests)
+mvn -B test -f src/backend/pom.xml
 
 # Run single test class
-mvn -B test -Dtest=HealthControllerTest -f src/backend/pom.xml
+mvn -B test -Dtest=MasterServiceTest -f src/backend/pom.xml
 
 # Run single test method
-mvn -B test -Dtest=HealthControllerTest#shouldReturnHealth -f src/backend/pom.xml
+mvn -B test -Dtest=MasterServiceTest#create_shouldSaveAndReturnDto -f src/backend/pom.xml
+
+# Run tests by category (service tests only)
+mvn -B test -Dtest="MasterServiceTest,FolderServiceTest,DocumentServiceTest,AclServiceTest,PermissionEvaluatorTest" -f src/backend/pom.xml
+
+# Run tests by category (controller tests only)
+mvn -B test -Dtest="MasterControllerTest,FolderControllerTest,DocumentControllerTest,AclControllerTest" -f src/backend/pom.xml
 
 # Package JAR for deployment
 mvn -B clean package -DskipTests -f src/backend/pom.xml
@@ -125,6 +131,15 @@ Backend expects these in `application.yml` or as environment variables:
 - `AZURE_TENANT_ID` — Entra ID tenant for JWT validation
 
 All Azure connection strings/keys are saved in `infra/output/azure-resources.env` (gitignored).
+
+## Testing Conventions
+
+- **Service tests:** Pure unit tests with `@ExtendWith(MockitoExtension.class)`, `@Mock`, `@InjectMocks`. No Spring context.
+- **Controller tests:** `@WebMvcTest` with `@MockitoBean` (Spring Boot 3.4+, NOT `@MockBean`). Import `TestSecurityConfig.class` + `GlobalExceptionHandler.class`.
+- **Infrastructure tests:** Mockito-based unit tests (e.g., BlobStorageServiceTest mocks BlobServiceClient chain).
+- **Assertions:** AssertJ (`assertThat`, `assertThatThrownBy`).
+- **Test security:** `TestSecurityConfig` in test config package disables CSRF and permits all. Also `excludeAutoConfiguration` for OAuth2 in `@WebMvcTest`.
+- Test file location mirrors main: `src/test/java/com/sedin/presales/{same package structure}`
 
 ## Conventions
 

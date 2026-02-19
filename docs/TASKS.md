@@ -51,7 +51,7 @@
 ### 1C: Authentication & Authorization
 - [x] P1-23: Configure Spring Security with Entra ID JWT validation + CORS + @EnableMethodSecurity
 - [x] P1-24: Create `UserPrincipal` + `CurrentUserService` to extract current user from JWT
-- [ ] P1-25: Create ACL service — `AclService` (checkAccess, grantAccess, revokeAccess, getAccessibleDocumentIds)
+- [x] P1-25: Create ACL service — `AclService` (checkAccess, grantAccess, revokeAccess, getAccessibleDocumentIds)
 - [ ] P1-26: Create `@PreAuthorize` custom expressions or method-level security for role checks
 - [x] P1-27: Create dev-mode auth bypass (profile=dev, DevUserPrincipal + DevCurrentUserService)
 
@@ -67,31 +67,31 @@
 ## Phase 2: Document Management (DMS Core)
 
 ### 2A: Masters API (FR-047 to FR-049)
-- [ ] P2-01: Create CRUD service + controller for Domain master (`/api/v1/masters/domains`)
-- [ ] P2-02: Create CRUD service + controller for Industry master (`/api/v1/masters/industries`)
-- [ ] P2-03: Create CRUD service + controller for Technology master (`/api/v1/masters/technologies`)
-- [ ] P2-04: Create CRUD service + controller for BusinessUnit master (`/api/v1/masters/business-units`)
-- [ ] P2-05: Create CRUD service + controller for SBU master (`/api/v1/masters/sbus`)
-- [ ] P2-06: Create generic master service to reduce CRUD boilerplate
+- [x] P2-01: Create CRUD service + controller for Domain master (`/api/v1/masters/domains`)
+- [x] P2-02: Create CRUD service + controller for Industry master (`/api/v1/masters/industries`)
+- [x] P2-03: Create CRUD service + controller for Technology master (`/api/v1/masters/technologies`)
+- [x] P2-04: Create CRUD service + controller for BusinessUnit master (`/api/v1/masters/business-units`)
+- [x] P2-05: Create CRUD service + controller for SBU master (`/api/v1/masters/sbus`)
+- [x] P2-06: Create generic master service to reduce CRUD boilerplate
 
 ### 2B: Document Upload & Storage (FR-001 to FR-006)
-- [ ] P2-07: Create `DocumentService` — upload flow (validate file, store in Blob, create Document + Version + Metadata records)
-- [ ] P2-08: Create `DocumentController` — `POST /api/v1/documents/upload` (multipart file + metadata JSON)
-- [ ] P2-09: Create `DocumentController` — `GET /api/v1/documents` (paginated list with ACL filtering)
-- [ ] P2-10: Create `DocumentController` — `GET /api/v1/documents/{id}` (detail view with versions, renditions)
-- [ ] P2-11: Create `DocumentController` — `PUT /api/v1/documents/{id}` (update metadata)
-- [ ] P2-12: Create `DocumentController` — `DELETE /api/v1/documents/{id}` (soft delete)
+- [x] P2-07: Create `DocumentService` — upload flow (validate file, store in Blob, create Document + Version + Metadata records)
+- [x] P2-08: Create `DocumentController` — `POST /api/v1/documents/upload` (multipart file + metadata JSON)
+- [x] P2-09: Create `DocumentController` — `GET /api/v1/documents` (paginated list with ACL filtering)
+- [x] P2-10: Create `DocumentController` — `GET /api/v1/documents/{id}` (detail view with versions, renditions)
+- [x] P2-11: Create `DocumentController` — `PUT /api/v1/documents/{id}` (update metadata)
+- [x] P2-12: Create `DocumentController` — `DELETE /api/v1/documents/{id}` (soft delete)
 
 ### 2C: Versioning (FR-007 to FR-010)
-- [ ] P2-13: Create `VersionService` — re-upload creates new version, retains old
-- [ ] P2-14: Create `DocumentController` — `POST /api/v1/documents/{id}/versions` (upload new version)
-- [ ] P2-15: Create `DocumentController` — `GET /api/v1/documents/{id}/versions` (list versions)
-- [ ] P2-16: Create `DocumentController` — `GET /api/v1/documents/{id}/versions/{versionId}/download` (download specific version)
+- [x] P2-13: Create `VersionService` — re-upload creates new version, retains old
+- [x] P2-14: Create `DocumentController` — `POST /api/v1/documents/{id}/versions` (upload new version)
+- [x] P2-15: Create `DocumentController` — `GET /api/v1/documents/{id}/versions` (list versions)
+- [x] P2-16: Create `DocumentController` — `GET /api/v1/documents/{id}/versions/{versionId}/download` (download specific version)
 
 ### 2D: Access Control API (FR-011 to FR-014)
-- [ ] P2-17: Create `AclController` — `GET /api/v1/documents/{id}/acl` (list permissions)
-- [ ] P2-18: Create `AclController` — `POST /api/v1/documents/{id}/acl` (grant access)
-- [ ] P2-19: Create `AclController` — `DELETE /api/v1/documents/{id}/acl/{aclId}` (revoke access)
+- [x] P2-17: Create `AclController` — `GET /api/v1/acl/resource/{type}/{id}` (list permissions)
+- [x] P2-18: Create `AclController` — `POST /api/v1/acl` (grant access) + `POST /api/v1/acl/bulk` (bulk grant)
+- [x] P2-19: Create `AclController` — `DELETE /api/v1/acl/{id}` (revoke access) + `DELETE /api/v1/acl/resource/{type}/{id}` (revoke all)
 - [ ] P2-20: Integrate ACL filtering into document list query (only return docs user can access)
 
 ---
@@ -244,8 +244,9 @@
 
 ## Phase 14: Testing & Quality
 
-- [ ] P14-01: Backend unit tests — services (DocumentService, AclService, RenditionService)
-- [ ] P14-02: Backend integration tests — controllers with MockMvc
+- [x] P14-01: Backend unit tests — services (MasterService, FolderService, DocumentService, AclService, PermissionEvaluator) — 48 tests
+- [x] P14-02: Backend controller tests — @WebMvcTest (MasterController, FolderController, DocumentController, AclController) — 29 tests
+- [x] P14-02b: Backend infra/util tests — GlobalExceptionHandler, DocumentMapper, BlobStorageService — 19 tests
 - [ ] P14-03: Backend integration tests — repository layer with Testcontainers (PostgreSQL)
 - [ ] P14-04: Frontend unit tests — React Testing Library for key components
 - [ ] P14-05: E2E tests — Playwright for critical flows (login → upload → view → search)
@@ -299,8 +300,8 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | Phase | Total Tasks | Done | Pending | % Complete |
 |-------|------------|------|---------|------------|
 | P0: Setup & Infra | 10 | 9 | 1 (blocked) | 90% |
-| P1: Foundation | 32 | 30 | 2 | 94% |
-| P2: DMS Core | 20 | 0 | 20 | 0% |
+| P1: Foundation | 32 | 31 | 1 | 97% |
+| P2: DMS Core | 20 | 19 | 1 | 95% |
 | P3: Renditions | 14 | 0 | 14 | 0% |
 | P4: RAG & Search | 8 | 0 | 8 | 0% |
 | P5: CS Agent | 12 | 0 | 12 | 0% |
@@ -312,6 +313,6 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P11: FE Search | 4 | 0 | 4 | 0% |
 | P12: FE CS Agent | 8 | 0 | 8 | 0% |
 | P13: FE Admin | 5 | 0 | 5 | 0% |
-| P14: Testing | 6 | 0 | 6 | 0% |
+| P14: Testing | 7 | 3 | 4 | 43% |
 | P15: Deployment | 7 | 0 | 7 | 0% |
-| **TOTAL** | **156** | **39** | **117** | **25%** |
+| **TOTAL** | **157** | **62** | **95** | **39%** |
