@@ -4,6 +4,7 @@ import com.sedin.presales.application.dto.ApiResponse;
 import com.sedin.presales.application.dto.SummaryResponseDto;
 import com.sedin.presales.application.service.SummaryService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,6 +34,7 @@ public class SummaryController {
     }
 
     @PostMapping("/summary/regenerate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     public ResponseEntity<ApiResponse<SummaryResponseDto>> regenerateSummary(@PathVariable UUID documentId) {
         log.debug("POST /api/v1/documents/{}/summary/regenerate", documentId);
         SummaryResponseDto summary = summaryService.regenerateSummary(documentId);

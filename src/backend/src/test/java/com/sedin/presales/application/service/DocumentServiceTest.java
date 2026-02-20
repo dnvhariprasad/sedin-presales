@@ -23,6 +23,7 @@ import com.sedin.presales.domain.repository.IndustryRepository;
 import com.sedin.presales.domain.repository.RenditionRepository;
 import com.sedin.presales.domain.repository.SbuRepository;
 import com.sedin.presales.domain.repository.TechnologyRepository;
+import com.sedin.presales.config.CurrentUserService;
 import com.sedin.presales.infrastructure.storage.BlobStorageService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,13 +33,25 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.sedin.presales.application.dto.PagedResponse;
+import com.sedin.presales.config.UserPrincipal;
+import com.sedin.presales.domain.enums.Permission;
+import com.sedin.presales.domain.enums.ResourceType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,6 +61,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -95,6 +109,12 @@ class DocumentServiceTest {
 
     @Mock
     private RenditionService renditionService;
+
+    @Mock
+    private CurrentUserService currentUserService;
+
+    @Mock
+    private AclService aclService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -430,5 +450,114 @@ class DocumentServiceTest {
         assertThat(result).isNotNull();
         assertThat(result).isEqualTo(expectedStream);
         verify(blobStorageService).download("documents", filePath);
+    }
+
+    @Test
+    @DisplayName("list should return all documents for admin user without ACL filtering")
+    void list_shouldReturnAllDocumentsForAdmin() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        UserPrincipal adminUser = UserPrincipal.builder()
+                .userId(UUID.randomUUID().toString())
+                .email("admin@test.com")
+                .displayName("Admin")
+                .role("ADMIN")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(adminUser);
+
+        Document doc = Document.builder()
+                .title("Admin Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+        doc.setId(UUID.randomUUID());
+
+        DocumentDto dto = DocumentDto.builder()
+                .id(doc.getId())
+                .title("Admin Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+
+        Page<Document> page = new PageImpl<>(List.of(doc), pageable, 1);
+        when(documentRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+        when(documentMapper.toDto(doc)).thenReturn(dto);
+
+        PagedResponse<DocumentDto> result = documentService.list(pageable, null, null, null, null);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getTitle()).isEqualTo("Admin Document");
+        // Admin should NOT trigger ACL lookup
+        verify(aclService, never()).getAccessibleResourceIds(any(UUID.class), any(ResourceType.class), any(Permission.class));
+    }
+
+    @Test
+    @DisplayName("list should filter by ACL for non-admin user")
+    void list_shouldFilterByAclForNonAdminUser() {
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID userId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+
+        UserPrincipal editorUser = UserPrincipal.builder()
+                .userId(userId.toString())
+                .email("editor@test.com")
+                .displayName("Editor")
+                .role("EDITOR")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(editorUser);
+
+        Set<UUID> accessibleIds = Set.of(docId);
+        when(aclService.getAccessibleResourceIds(userId, ResourceType.DOCUMENT, Permission.READ))
+                .thenReturn(accessibleIds);
+
+        Document doc = Document.builder()
+                .title("Editor Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+        doc.setId(docId);
+
+        DocumentDto dto = DocumentDto.builder()
+                .id(docId)
+                .title("Editor Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+
+        Page<Document> page = new PageImpl<>(List.of(doc), pageable, 1);
+        when(documentRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+        when(documentMapper.toDto(doc)).thenReturn(dto);
+
+        PagedResponse<DocumentDto> result = documentService.list(pageable, null, null, null, null);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        verify(aclService).getAccessibleResourceIds(userId, ResourceType.DOCUMENT, Permission.READ);
+        verify(documentRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    @DisplayName("list should return empty for non-admin with no access")
+    void list_shouldReturnEmptyForNonAdminWithNoAccess() {
+        Pageable pageable = PageRequest.of(0, 10);
+        UUID userId = UUID.randomUUID();
+
+        UserPrincipal viewerUser = UserPrincipal.builder()
+                .userId(userId.toString())
+                .email("viewer@test.com")
+                .displayName("Viewer")
+                .role("VIEWER")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(viewerUser);
+
+        when(aclService.getAccessibleResourceIds(userId, ResourceType.DOCUMENT, Permission.READ))
+                .thenReturn(Collections.emptySet());
+
+        PagedResponse<DocumentDto> result = documentService.list(pageable, null, null, null, null);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isEqualTo(0);
+        assertThat(result.getTotalPages()).isEqualTo(0);
+        assertThat(result.isLast()).isTrue();
+        // Should NOT hit the database when user has no access
+        verify(documentRepository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 }

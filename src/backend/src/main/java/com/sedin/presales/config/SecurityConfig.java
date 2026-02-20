@@ -1,5 +1,6 @@
 package com.sedin.presales.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -19,6 +20,12 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private final JwtRoleConverter jwtRoleConverter;
+
+    public SecurityConfig(@Autowired(required = false) JwtRoleConverter jwtRoleConverter) {
+        this.jwtRoleConverter = jwtRoleConverter;
+    }
+
     @Bean
     @Profile("!dev")
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource) throws Exception {
@@ -31,7 +38,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtRoleConverter)));
         return http.build();
     }
 

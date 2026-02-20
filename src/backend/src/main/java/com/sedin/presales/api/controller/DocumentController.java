@@ -1,5 +1,6 @@
 package com.sedin.presales.api.controller;
 
+import com.sedin.presales.config.audit.Audited;
 import com.sedin.presales.application.dto.ApiResponse;
 import com.sedin.presales.application.dto.CompareViewDto;
 import com.sedin.presales.application.dto.CreateDocumentRequest;
@@ -23,6 +24,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -50,7 +52,9 @@ public class DocumentController {
         this.documentService = documentService;
     }
 
+    @Audited(action = "UPLOAD_DOCUMENT", resourceType = "DOCUMENT")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     public ResponseEntity<ApiResponse<DocumentDto>> upload(
             @RequestParam("file") MultipartFile file,
             @Valid @RequestPart("request") CreateDocumentRequest request) {
@@ -82,7 +86,9 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.success(document));
     }
 
+    @Audited(action = "UPDATE_DOCUMENT", resourceType = "DOCUMENT")
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     public ResponseEntity<ApiResponse<DocumentDto>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
@@ -91,14 +97,18 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.success(document, "Document updated successfully"));
     }
 
+    @Audited(action = "DELETE_DOCUMENT", resourceType = "DOCUMENT")
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         log.debug("DELETE /api/v1/documents/{}", id);
         documentService.delete(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Document archived successfully"));
     }
 
+    @Audited(action = "UPLOAD_VERSION", resourceType = "DOCUMENT")
     @PostMapping(value = "/{id}/versions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'EDITOR')")
     public ResponseEntity<ApiResponse<DocumentVersionDto>> uploadNewVersion(
             @PathVariable UUID id,
             @RequestParam("file") MultipartFile file,

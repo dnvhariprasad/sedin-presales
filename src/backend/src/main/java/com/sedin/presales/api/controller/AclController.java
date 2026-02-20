@@ -1,5 +1,6 @@
 package com.sedin.presales.api.controller;
 
+import com.sedin.presales.config.audit.Audited;
 import com.sedin.presales.application.dto.AclEntryDto;
 import com.sedin.presales.application.dto.ApiResponse;
 import com.sedin.presales.application.dto.BulkGrantAccessRequest;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +28,7 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/acl")
+@PreAuthorize("hasRole('ADMIN')")
 public class AclController {
 
     private final AclService aclService;
@@ -34,6 +37,7 @@ public class AclController {
         this.aclService = aclService;
     }
 
+    @Audited(action = "GRANT_ACCESS", resourceType = "ACL")
     @PostMapping
     public ResponseEntity<ApiResponse<AclEntryDto>> grantAccess(
             @Valid @RequestBody GrantAccessRequest request) {
@@ -43,6 +47,7 @@ public class AclController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(dto, "Access granted successfully"));
     }
 
+    @Audited(action = "BULK_GRANT_ACCESS", resourceType = "ACL")
     @PostMapping("/bulk")
     public ResponseEntity<ApiResponse<List<AclEntryDto>>> bulkGrantAccess(
             @Valid @RequestBody BulkGrantAccessRequest request) {
@@ -51,6 +56,7 @@ public class AclController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(dtos, "Bulk access granted successfully"));
     }
 
+    @Audited(action = "REVOKE_ACCESS", resourceType = "ACL")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> revokeAccess(@PathVariable UUID id) {
         log.debug("REST request to revoke access with id: {}", id);
@@ -58,6 +64,7 @@ public class AclController {
         return ResponseEntity.ok(ApiResponse.success(null, "Access revoked successfully"));
     }
 
+    @Audited(action = "REVOKE_ALL_ACCESS", resourceType = "ACL")
     @DeleteMapping("/resource/{resourceType}/{resourceId}")
     public ResponseEntity<ApiResponse<Void>> revokeAllAccess(
             @PathVariable ResourceType resourceType,

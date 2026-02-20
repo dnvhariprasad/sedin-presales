@@ -1,5 +1,6 @@
 package com.sedin.presales.api.controller;
 
+import com.sedin.presales.config.audit.Audited;
 import com.sedin.presales.application.dto.ApiResponse;
 import com.sedin.presales.application.dto.CreateMasterRequest;
 import com.sedin.presales.application.dto.MasterDto;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,7 +57,9 @@ public class MasterController {
         return ResponseEntity.ok(ApiResponse.success(dto));
     }
 
+    @Audited(action = "CREATE_MASTER", resourceType = "MASTER")
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<MasterDto>> create(
             @PathVariable String type,
             @Valid @RequestBody CreateMasterRequest request) {
@@ -64,7 +68,9 @@ public class MasterController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(dto, "Created successfully"));
     }
 
+    @Audited(action = "UPDATE_MASTER", resourceType = "MASTER")
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<MasterDto>> update(
             @PathVariable String type,
             @PathVariable UUID id,
@@ -74,7 +80,9 @@ public class MasterController {
         return ResponseEntity.ok(ApiResponse.success(dto, "Updated successfully"));
     }
 
+    @Audited(action = "DELETE_MASTER", resourceType = "MASTER")
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable String type,
             @PathVariable UUID id) {

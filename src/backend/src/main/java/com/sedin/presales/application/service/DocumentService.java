@@ -25,8 +25,12 @@ import com.sedin.presales.domain.entity.BusinessUnit;
 import com.sedin.presales.domain.entity.Sbu;
 import com.sedin.presales.domain.entity.Rendition;
 import com.sedin.presales.domain.enums.DocumentStatus;
+import com.sedin.presales.domain.enums.Permission;
 import com.sedin.presales.domain.enums.RenditionStatus;
 import com.sedin.presales.domain.enums.RenditionType;
+import com.sedin.presales.domain.enums.ResourceType;
+import com.sedin.presales.config.CurrentUserService;
+import com.sedin.presales.config.UserPrincipal;
 import com.sedin.presales.domain.repository.DocumentMetadataRepository;
 import com.sedin.presales.domain.repository.DocumentRepository;
 import com.sedin.presales.domain.repository.DocumentTypeRepository;
@@ -52,6 +56,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -78,6 +83,8 @@ public class DocumentService {
     private final BlobStorageService blobStorageService;
     private final DocumentMapper documentMapper;
     private final RenditionService renditionService;
+    private final CurrentUserService currentUserService;
+    private final AclService aclService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentMetadataRepository documentMetadataRepository,
@@ -92,7 +99,9 @@ public class DocumentService {
                            RenditionRepository renditionRepository,
                            BlobStorageService blobStorageService,
                            DocumentMapper documentMapper,
-                           RenditionService renditionService) {
+                           RenditionService renditionService,
+                           CurrentUserService currentUserService,
+                           AclService aclService) {
         this.documentRepository = documentRepository;
         this.documentMetadataRepository = documentMetadataRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -107,6 +116,8 @@ public class DocumentService {
         this.blobStorageService = blobStorageService;
         this.documentMapper = documentMapper;
         this.renditionService = renditionService;
+        this.currentUserService = currentUserService;
+        this.aclService = aclService;
     }
 
     @Transactional
@@ -182,8 +193,38 @@ public class DocumentService {
         log.debug("Listing documents with filters - folderId: {}, documentTypeId: {}, status: {}, search: {}",
                 folderId, documentTypeId, status, search);
 
+        // ACL filtering: determine accessible document IDs for non-admin users
+        UserPrincipal currentUser = currentUserService.getCurrentUser();
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(currentUser.getRole());
+        Set<UUID> accessibleDocumentIds = null;
+
+        if (!isAdmin) {
+            accessibleDocumentIds = aclService.getAccessibleResourceIds(
+                    UUID.fromString(currentUser.getUserId()), ResourceType.DOCUMENT, Permission.READ);
+            log.debug("User {} has access to {} documents", currentUser.getUserId(), accessibleDocumentIds.size());
+
+            // If non-admin user has no accessible documents, return empty result immediately
+            if (accessibleDocumentIds.isEmpty()) {
+                return PagedResponse.<DocumentDto>builder()
+                        .content(Collections.emptyList())
+                        .page(pageable.getPageNumber())
+                        .size(pageable.getPageSize())
+                        .totalElements(0)
+                        .totalPages(0)
+                        .last(true)
+                        .build();
+            }
+        }
+
+        final Set<UUID> filteredDocumentIds = accessibleDocumentIds;
+
         Specification<Document> spec = (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // ACL filter: restrict to accessible documents for non-admin users
+            if (filteredDocumentIds != null) {
+                predicates.add(root.get("id").in(filteredDocumentIds));
+            }
 
             // Exclude archived/deleted by default unless explicitly filtering by status
             if (status != null) {
