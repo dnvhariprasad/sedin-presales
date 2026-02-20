@@ -9,6 +9,7 @@ import com.sedin.presales.application.dto.DocumentDownloadDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
 import com.sedin.presales.application.dto.DocumentViewDto;
+import com.sedin.presales.application.dto.IndexToggleResponseDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.service.DocumentService;
@@ -160,6 +161,15 @@ public class DocumentController {
         log.debug("GET /api/v1/documents/{}/versions/{}/compare/{}", id, v1, v2);
         CompareViewDto compareDto = documentService.getCompareUrls(id, v1, v2);
         return ResponseEntity.ok(ApiResponse.success(compareDto));
+    }
+
+    @Audited(action = "TOGGLE_RAG_INDEX", resourceType = "DOCUMENT")
+    @PutMapping("/{id}/index-toggle")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<IndexToggleResponseDto>> toggleRagIndex(@PathVariable UUID id) {
+        log.debug("PUT /api/v1/documents/{}/index-toggle", id);
+        IndexToggleResponseDto result = documentService.toggleRagIndex(id);
+        return ResponseEntity.ok(ApiResponse.success(result, result.getMessage()));
     }
 
     @GetMapping("/{id}/download")

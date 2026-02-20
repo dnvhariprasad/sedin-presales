@@ -4,6 +4,7 @@ import com.sedin.presales.application.dto.CreateDocumentRequest;
 import com.sedin.presales.application.dto.DocumentDetailDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
+import com.sedin.presales.application.dto.IndexToggleResponseDto;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.exception.BadRequestException;
 import com.sedin.presales.application.exception.ResourceNotFoundException;
@@ -115,6 +116,9 @@ class DocumentServiceTest {
 
     @Mock
     private AclService aclService;
+
+    @Mock
+    private IndexingService indexingService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -571,5 +575,111 @@ class DocumentServiceTest {
         assertThat(result.isLast()).isTrue();
         // Should NOT hit the database when user has no access
         verify(documentRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("toggleRagIndex should enable indexing and trigger async indexDocument")
+    void toggleRagIndex_shouldEnableIndexingAndTriggerAsync() {
+        UUID id = UUID.randomUUID();
+        Document document = Document.builder()
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .ragIndexed(false)
+                .build();
+        document.setId(id);
+
+        when(documentRepository.findById(id)).thenReturn(Optional.of(document));
+        when(documentRepository.save(any(Document.class))).thenReturn(document);
+
+        IndexToggleResponseDto result = documentService.toggleRagIndex(id);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(id);
+        assertThat(result.isRagIndexed()).isTrue();
+        assertThat(result.getMessage()).isEqualTo("Document queued for indexing");
+        verify(indexingService).indexDocument(id);
+        verify(indexingService, never()).removeFromIndex(any(UUID.class));
+    }
+
+    @Test
+    @DisplayName("toggleRagIndex should disable indexing and remove from index")
+    void toggleRagIndex_shouldDisableIndexingAndRemoveFromIndex() {
+        UUID id = UUID.randomUUID();
+        Document document = Document.builder()
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .ragIndexed(true)
+                .build();
+        document.setId(id);
+
+        when(documentRepository.findById(id)).thenReturn(Optional.of(document));
+        when(documentRepository.save(any(Document.class))).thenReturn(document);
+
+        IndexToggleResponseDto result = documentService.toggleRagIndex(id);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(id);
+        assertThat(result.isRagIndexed()).isFalse();
+        assertThat(result.getMessage()).isEqualTo("Document removed from search index");
+        verify(indexingService).removeFromIndex(id);
+        verify(indexingService, never()).indexDocument(any(UUID.class));
+    }
+
+    @Test
+    @DisplayName("toggleRagIndex should throw when document not found")
+    void toggleRagIndex_shouldThrowWhenDocumentNotFound() {
+        UUID id = UUID.randomUUID();
+        when(documentRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentService.toggleRagIndex(id))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("uploadNewVersion should re-index when document is RAG indexed")
+    void uploadNewVersion_shouldReindexWhenRagIndexed() throws IOException {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        Document document = Document.builder()
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .ragIndexed(true)
+                .build();
+        document.setId(docId);
+
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("updated.pdf");
+        when(file.getSize()).thenReturn(2048L);
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        DocumentVersion savedVersion = DocumentVersion.builder()
+                .document(document)
+                .versionNumber(2)
+                .filePath("documents/" + docId + "/2/updated.pdf")
+                .fileName("updated.pdf")
+                .fileSize(2048L)
+                .contentType("application/pdf")
+                .build();
+        savedVersion.setId(UUID.randomUUID());
+
+        DocumentVersionDto versionDto = DocumentVersionDto.builder()
+                .id(savedVersion.getId())
+                .versionNumber(2)
+                .fileName("updated.pdf")
+                .build();
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(blobStorageService.upload(anyString(), anyString(), any(InputStream.class), anyLong(), anyString()))
+                .thenReturn("https://blob.storage/documents/updated.pdf");
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenReturn(savedVersion);
+        when(documentRepository.save(any(Document.class))).thenReturn(document);
+        when(documentMapper.toVersionDto(savedVersion)).thenReturn(versionDto);
+
+        documentService.uploadNewVersion(docId, file, "Updated content");
+
+        verify(indexingService).indexDocument(docId);
     }
 }

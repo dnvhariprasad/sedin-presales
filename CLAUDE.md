@@ -61,7 +61,7 @@ mvn -B clean compile -f src/backend/pom.xml
 # Run API locally (dev profile: ddl-auto=update, flyway disabled)
 mvn -B spring-boot:run -Dspring-boot.run.profiles=dev -f src/backend/pom.xml
 
-# Run all tests (96 tests)
+# Run all tests (139 tests)
 mvn -B test -f src/backend/pom.xml
 
 # Run single test class
@@ -71,10 +71,10 @@ mvn -B test -Dtest=MasterServiceTest -f src/backend/pom.xml
 mvn -B test -Dtest=MasterServiceTest#create_shouldSaveAndReturnDto -f src/backend/pom.xml
 
 # Run tests by category (service tests only)
-mvn -B test -Dtest="MasterServiceTest,FolderServiceTest,DocumentServiceTest,AclServiceTest,PermissionEvaluatorTest" -f src/backend/pom.xml
+mvn -B test -Dtest="MasterServiceTest,FolderServiceTest,DocumentServiceTest,AclServiceTest,PermissionEvaluatorTest,IndexingServiceTest,SearchServiceTest" -f src/backend/pom.xml
 
 # Run tests by category (controller tests only)
-mvn -B test -Dtest="MasterControllerTest,FolderControllerTest,DocumentControllerTest,AclControllerTest" -f src/backend/pom.xml
+mvn -B test -Dtest="MasterControllerTest,FolderControllerTest,DocumentControllerTest,AclControllerTest,SearchControllerTest" -f src/backend/pom.xml
 
 # Package JAR for deployment
 mvn -B clean package -DskipTests -f src/backend/pom.xml
@@ -84,7 +84,7 @@ mvn -B clean package -DskipTests -f src/backend/pom.xml
 ```bash
 cd src/frontend
 npm install
-npm run dev          # Dev server (port 5173, proxies /api to localhost:8080)
+npm run dev          # Dev server (port 3010, proxies /api to localhost:8080)
 npm run build        # Production build
 npm run lint         # ESLint
 ```
@@ -114,7 +114,9 @@ npm run lint         # ESLint
 - **Clean Architecture:** Dependency flows inward. Controllers never access repositories directly; always go through services.
 - **Document-level ACLs:** Every document has explicit ACL entries. ACL checks enforced at the repository/service level, not in controllers.
 - **Rendition pipeline:** Upload → Azure Function trigger → Aspose converts to PDF → Blob Storage. Summaries are text file renditions linked to the original document.
-- **RAG with ACL filtering:** Azure AI Search indexes only flagged documents. Query results filtered by user's ACL permissions before being sent to Azure OpenAI via Spring AI.
+- **RAG with ACL filtering:** Azure AI Search indexes only flagged documents. Query results filtered by user's ACL permissions before being sent to Azure OpenAI via REST API. Hybrid search (text + vector) with HNSW algorithm, 1536-dim embeddings (text-embedding-3-small). Admin toggles indexing per document via `PUT /api/v1/documents/{id}/index-toggle`.
+- **RAG Pipeline:** Download → Document Intelligence text extraction → chunk (~1000 chars, 100 overlap) → batch embed → push to Azure AI Search. Re-indexes on new version upload if `ragIndexed=true`. Async via `indexingExecutor` thread pool.
+- **Search API:** `POST /api/v1/search` with hybrid search, ACL post-filtering (fetch 3x topK, filter, trim), optional RAG answer via GPT-4o-mini with source citations.
 - **Case Study Agent:** Admin-configured templates stored in DB. Active agent runs on upload to validate/reformat case studies via Aspose.Slides for Java.
 - **No Docker:** All deployments are direct JAR/package deploys to Azure App Service. This is a hard requirement.
 - **Profiles:** `dev` profile disables Flyway, uses `ddl-auto: update`, enables DEBUG logging. Production uses Flyway with `ddl-auto: validate`.

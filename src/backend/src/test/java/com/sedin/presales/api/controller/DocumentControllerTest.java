@@ -5,6 +5,7 @@ import com.sedin.presales.application.dto.CreateDocumentRequest;
 import com.sedin.presales.application.dto.DocumentDetailDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
+import com.sedin.presales.application.dto.IndexToggleResponseDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.exception.GlobalExceptionHandler;
@@ -244,5 +245,23 @@ class DocumentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"test.pdf\""))
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+    }
+
+    @Test
+    void toggleRagIndex_shouldReturn200() throws Exception {
+        IndexToggleResponseDto responseDto = IndexToggleResponseDto.builder()
+                .documentId(testId)
+                .ragIndexed(true)
+                .message("Document queued for indexing")
+                .build();
+
+        when(documentService.toggleRagIndex(testId)).thenReturn(responseDto);
+
+        mockMvc.perform(put("/api/v1/documents/{id}/index-toggle", testId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.documentId").value(testId.toString()))
+                .andExpect(jsonPath("$.data.ragIndexed").value(true))
+                .andExpect(jsonPath("$.message").value("Document queued for indexing"));
     }
 }

@@ -8,6 +8,7 @@ import com.sedin.presales.application.dto.DocumentDownloadDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
 import com.sedin.presales.application.dto.DocumentViewDto;
+import com.sedin.presales.application.dto.IndexToggleResponseDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.exception.AccessDeniedException;
@@ -86,6 +87,7 @@ public class DocumentService {
     private final RenditionService renditionService;
     private final CurrentUserService currentUserService;
     private final AclService aclService;
+    private final IndexingService indexingService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentMetadataRepository documentMetadataRepository,
@@ -102,7 +104,8 @@ public class DocumentService {
                            DocumentMapper documentMapper,
                            RenditionService renditionService,
                            CurrentUserService currentUserService,
-                           AclService aclService) {
+                           AclService aclService,
+                           IndexingService indexingService) {
         this.documentRepository = documentRepository;
         this.documentMetadataRepository = documentMetadataRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -119,6 +122,7 @@ public class DocumentService {
         this.renditionService = renditionService;
         this.currentUserService = currentUserService;
         this.aclService = aclService;
+        this.indexingService = indexingService;
     }
 
     @Transactional
@@ -376,8 +380,37 @@ public class DocumentService {
         // Trigger async PDF rendition generation
         renditionService.generatePdfRendition(savedVersion.getId());
 
+        // Re-index if document was previously indexed
+        if (Boolean.TRUE.equals(document.getRagIndexed())) {
+            indexingService.indexDocument(documentId);
+        }
+
         log.info("Uploaded version {} for document: {}", newVersionNumber, documentId);
         return documentMapper.toVersionDto(savedVersion);
+    }
+
+    @Transactional
+    public IndexToggleResponseDto toggleRagIndex(UUID id) {
+        log.info("Toggling RAG index for document: {}", id);
+        Document document = documentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
+
+        boolean newState = !Boolean.TRUE.equals(document.getRagIndexed());
+        document.setRagIndexed(newState);
+        documentRepository.save(document);
+
+        if (newState) {
+            indexingService.indexDocument(id);
+        } else {
+            indexingService.removeFromIndex(id);
+        }
+
+        String message = newState ? "Document queued for indexing" : "Document removed from search index";
+        return IndexToggleResponseDto.builder()
+                .documentId(id)
+                .ragIndexed(newState)
+                .message(message)
+                .build();
     }
 
     public List<DocumentVersionDto> getVersions(UUID documentId) {

@@ -52,13 +52,13 @@
 - [x] P1-23: Configure Spring Security with Entra ID JWT validation + CORS + @EnableMethodSecurity
 - [x] P1-24: Create `UserPrincipal` + `CurrentUserService` to extract current user from JWT
 - [x] P1-25: Create ACL service — `AclService` (checkAccess, grantAccess, revokeAccess, getAccessibleDocumentIds)
-- [ ] P1-26: Create `@PreAuthorize` custom expressions or method-level security for role checks
+- [x] P1-26: Create `@PreAuthorize` custom expressions or method-level security for role checks
 - [x] P1-27: Create dev-mode auth bypass (profile=dev, DevUserPrincipal + DevCurrentUserService)
 
 ### 1D: Global Backend Infrastructure
 - [x] P1-28: Create global exception handler (`@RestControllerAdvice`) with consistent API response envelope
 - [x] P1-29: Create standard API response DTOs (`ApiResponse<T>`, `PagedResponse<T>`, `ErrorDetail`, `FieldError`)
-- [ ] P1-30: Create audit logging interceptor/aspect (auto-log controller actions)
+- [x] P1-30: Create audit logging interceptor/aspect (auto-log controller actions)
 - [x] P1-31: Configure Azure Blob Storage client bean (`BlobServiceClient` + `AzureBlobConfig`)
 - [x] P1-32: Create `BlobStorageService` (upload, download, delete, generateSasUrl, exists)
 
@@ -92,7 +92,7 @@
 - [x] P2-17: Create `AclController` — `GET /api/v1/acl/resource/{type}/{id}` (list permissions)
 - [x] P2-18: Create `AclController` — `POST /api/v1/acl` (grant access) + `POST /api/v1/acl/bulk` (bulk grant)
 - [x] P2-19: Create `AclController` — `DELETE /api/v1/acl/{id}` (revoke access) + `DELETE /api/v1/acl/resource/{type}/{id}` (revoke all)
-- [ ] P2-20: Integrate ACL filtering into document list query (only return docs user can access)
+- [x] P2-20: Integrate ACL filtering into document list query (only return docs user can access)
 
 ---
 
@@ -122,14 +122,14 @@
 
 ## Phase 4: RAG & Intelligent Search (FR-026 to FR-031)
 
-- [ ] P4-01: Create `AzureSearchService` — configure Azure AI Search client
-- [ ] P4-02: Create search index schema for documents (title, content, domain, industry, technologies, customer, embedding vector)
-- [ ] P4-03: Create `IndexingService` — extract text → generate embeddings → push to AI Search index
-- [ ] P4-04: Wire indexing into upload pipeline (only if `rag_indexed` flag is true)
-- [ ] P4-05: Create `POST /api/v1/search` — natural language query → vector search → ACL filter → return ranked results
-- [ ] P4-06: Implement RAG response — send search results + user query to Azure OpenAI → return AI-generated answer with source citations
-- [ ] P4-07: Create `PUT /api/v1/documents/{id}/index-toggle` — toggle indexing on/off, add/remove from index
-- [ ] P4-08: Handle re-indexing on new version upload
+- [x] P4-01: Create `AzureSearchService` — configure Azure AI Search client
+- [x] P4-02: Create search index schema for documents (title, content, domain, industry, technologies, customer, embedding vector)
+- [x] P4-03: Create `IndexingService` — extract text → generate embeddings → push to AI Search index
+- [x] P4-04: Wire indexing into upload pipeline (only if `rag_indexed` flag is true)
+- [x] P4-05: Create `POST /api/v1/search` — natural language query → vector search → ACL filter → return ranked results
+- [x] P4-06: Implement RAG response — send search results + user query to Azure OpenAI → return AI-generated answer with source citations
+- [x] P4-07: Create `PUT /api/v1/documents/{id}/index-toggle` — toggle indexing on/off, add/remove from index
+- [x] P4-08: Handle re-indexing on new version upload
 
 ---
 
@@ -300,10 +300,10 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | Phase | Total Tasks | Done | Pending | % Complete |
 |-------|------------|------|---------|------------|
 | P0: Setup & Infra | 10 | 9 | 1 (blocked) | 90% |
-| P1: Foundation | 32 | 31 | 1 | 97% |
-| P2: DMS Core | 20 | 19 | 1 | 95% |
+| P1: Foundation | 32 | 32 | 0 | 100% |
+| P2: DMS Core | 20 | 20 | 0 | 100% |
 | P3: Renditions | 14 | 14 | 0 | 100% |
-| P4: RAG & Search | 8 | 0 | 8 | 0% |
+| P4: RAG & Search | 8 | 8 | 0 | 100% |
 | P5: CS Agent | 12 | 0 | 12 | 0% |
 | P6: Admin BE | 4 | 0 | 4 | 0% |
 | P7: FE Layout | 7 | 0 | 7 | 0% |
@@ -315,4 +315,4 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P13: FE Admin | 5 | 0 | 5 | 0% |
 | P14: Testing | 7 | 3 | 4 | 43% |
 | P15: Deployment | 7 | 0 | 7 | 0% |
-| **TOTAL** | **157** | **76** | **81** | **48%** |
+| **TOTAL** | **157** | **86** | **71** | **55%** |
