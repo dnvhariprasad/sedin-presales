@@ -20,6 +20,7 @@ import com.sedin.presales.domain.repository.DocumentVersionRepository;
 import com.sedin.presales.domain.repository.DomainRepository;
 import com.sedin.presales.domain.repository.FolderRepository;
 import com.sedin.presales.domain.repository.IndustryRepository;
+import com.sedin.presales.domain.repository.RenditionRepository;
 import com.sedin.presales.domain.repository.SbuRepository;
 import com.sedin.presales.domain.repository.TechnologyRepository;
 import com.sedin.presales.infrastructure.storage.BlobStorageService;
@@ -84,10 +85,16 @@ class DocumentServiceTest {
     private SbuRepository sbuRepository;
 
     @Mock
+    private RenditionRepository renditionRepository;
+
+    @Mock
     private BlobStorageService blobStorageService;
 
     @Mock
     private DocumentMapper documentMapper;
+
+    @Mock
+    private RenditionService renditionService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -136,10 +143,21 @@ class DocumentServiceTest {
                 .status(DocumentStatus.ACTIVE)
                 .build();
 
+        DocumentVersion savedVersion = DocumentVersion.builder()
+                .document(savedDocument)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .fileSize(1024L)
+                .contentType("application/pdf")
+                .build();
+        savedVersion.setId(UUID.randomUUID());
+
         when(documentTypeRepository.findById(docTypeId)).thenReturn(Optional.of(documentType));
         when(documentRepository.save(any(Document.class))).thenReturn(savedDocument);
         when(blobStorageService.upload(anyString(), anyString(), any(InputStream.class), anyLong(), anyString()))
                 .thenReturn("https://blob.storage/documents/test.pdf");
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenReturn(savedVersion);
         when(documentMapper.toDto(savedDocument)).thenReturn(documentDto);
 
         DocumentDto result = documentService.upload(file, request);

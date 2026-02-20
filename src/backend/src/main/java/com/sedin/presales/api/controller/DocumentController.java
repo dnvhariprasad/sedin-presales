@@ -1,10 +1,13 @@
 package com.sedin.presales.api.controller;
 
 import com.sedin.presales.application.dto.ApiResponse;
+import com.sedin.presales.application.dto.CompareViewDto;
 import com.sedin.presales.application.dto.CreateDocumentRequest;
 import com.sedin.presales.application.dto.DocumentDetailDto;
+import com.sedin.presales.application.dto.DocumentDownloadDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
+import com.sedin.presales.application.dto.DocumentViewDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.service.DocumentService;
@@ -130,5 +133,29 @@ public class DocumentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + docVersion.getFileName() + "\"")
                 .contentType(MediaType.parseMediaType(contentType))
                 .body(new InputStreamResource(inputStream));
+    }
+
+    @GetMapping("/{id}/view")
+    public ResponseEntity<ApiResponse<DocumentViewDto>> getViewUrl(@PathVariable UUID id) {
+        log.debug("GET /api/v1/documents/{}/view", id);
+        DocumentViewDto viewDto = documentService.getViewUrl(id);
+        return ResponseEntity.ok(ApiResponse.success(viewDto));
+    }
+
+    @GetMapping("/{id}/versions/{v1}/compare/{v2}")
+    public ResponseEntity<ApiResponse<CompareViewDto>> getCompareUrls(
+            @PathVariable UUID id,
+            @PathVariable int v1,
+            @PathVariable int v2) {
+        log.debug("GET /api/v1/documents/{}/versions/{}/compare/{}", id, v1, v2);
+        CompareViewDto compareDto = documentService.getCompareUrls(id, v1, v2);
+        return ResponseEntity.ok(ApiResponse.success(compareDto));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<ApiResponse<DocumentDownloadDto>> getDownloadUrl(@PathVariable UUID id) {
+        log.debug("GET /api/v1/documents/{}/download", id);
+        DocumentDownloadDto downloadDto = documentService.getDownloadUrl(id);
+        return ResponseEntity.ok(ApiResponse.success(downloadDto));
     }
 }

@@ -99,24 +99,24 @@
 ## Phase 3: Renditions & Document Processing
 
 ### 3A: PDF Rendition (FR-015 to FR-017)
-- [ ] P3-01: Create `AsposeService` — initialize Aspose license on app startup
-- [ ] P3-02: Create `PdfRenditionService` — convert PPT/PPTX → PDF using Aspose.Slides
-- [ ] P3-03: Create `PdfRenditionService` — convert DOC/DOCX → PDF using Aspose.Words
-- [ ] P3-04: Wire rendition generation into upload pipeline (async, after document version created)
-- [ ] P3-05: Store PDF rendition in Blob Storage `renditions` container, link in `renditions` table
-- [ ] P3-06: Create Azure Function trigger for async rendition processing (or use Spring `@Async`)
+- [x] P3-01: Create `AsposeConfig` — initialize Aspose license on app startup (evaluation mode if no license)
+- [x] P3-02: Create `PdfRenditionService` — convert PPT/PPTX → PDF using Aspose.Slides
+- [x] P3-03: Create `PdfRenditionService` — convert DOC/DOCX → PDF using Aspose.Words (+ Excel via Aspose.Cells)
+- [x] P3-04: Wire rendition generation into upload pipeline (async, after document version created)
+- [x] P3-05: Store PDF rendition in Blob Storage `renditions` container, link in `renditions` table
+- [x] P3-06: Create Spring `@Async` rendition processing with ThreadPoolTaskExecutor (AsyncConfig)
 
 ### 3B: AI Summary Rendition (FR-018 to FR-021)
-- [ ] P3-07: Create `DocumentIntelligenceService` — extract text from uploaded documents using Azure Doc Intelligence
-- [ ] P3-08: Create `SummarizationService` — send extracted text to Azure OpenAI for summarization
-- [ ] P3-09: Store summary as text file in Blob Storage `summaries` container, link in `renditions` table
-- [ ] P3-10: Implement summary caching — serve from storage if exists, regenerate on new version
-- [ ] P3-11: Create `GET /api/v1/documents/{id}/summary` endpoint
+- [x] P3-07: Create `DocumentIntelligenceService` — extract text from uploaded documents using Azure Doc Intelligence
+- [x] P3-08: Create `SummarizationService` — send extracted text to Azure OpenAI for summarization (REST-based)
+- [x] P3-09: Store summary as text file in Blob Storage `summaries` container, link in `renditions` table
+- [x] P3-10: Implement summary caching — serve from storage if exists, regenerate on new version
+- [x] P3-11: Create `GET /api/v1/documents/{id}/summary` + `POST .../summary/regenerate` endpoints
 
 ### 3C: Document Viewer API (FR-022 to FR-025)
-- [ ] P3-12: Create `GET /api/v1/documents/{id}/view` — return PDF rendition URL (SAS token for Blob)
-- [ ] P3-13: Create `GET /api/v1/documents/{id}/versions/{v1}/compare/{v2}` — return two PDF URLs for side-by-side view
-- [ ] P3-14: Create `GET /api/v1/documents/{id}/download` — download native format
+- [x] P3-12: Create `GET /api/v1/documents/{id}/view` — return PDF rendition URL (SAS token for Blob)
+- [x] P3-13: Create `GET /api/v1/documents/{id}/versions/{v1}/compare/{v2}` — return two PDF URLs for side-by-side view
+- [x] P3-14: Create `GET /api/v1/documents/{id}/download` — download native format (SAS URL)
 
 ---
 
@@ -302,7 +302,7 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P0: Setup & Infra | 10 | 9 | 1 (blocked) | 90% |
 | P1: Foundation | 32 | 31 | 1 | 97% |
 | P2: DMS Core | 20 | 19 | 1 | 95% |
-| P3: Renditions | 14 | 0 | 14 | 0% |
+| P3: Renditions | 14 | 14 | 0 | 100% |
 | P4: RAG & Search | 8 | 0 | 8 | 0% |
 | P5: CS Agent | 12 | 0 | 12 | 0% |
 | P6: Admin BE | 4 | 0 | 4 | 0% |
@@ -315,4 +315,4 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P13: FE Admin | 5 | 0 | 5 | 0% |
 | P14: Testing | 7 | 3 | 4 | 43% |
 | P15: Deployment | 7 | 0 | 7 | 0% |
-| **TOTAL** | **157** | **62** | **95** | **39%** |
+| **TOTAL** | **157** | **76** | **81** | **48%** |

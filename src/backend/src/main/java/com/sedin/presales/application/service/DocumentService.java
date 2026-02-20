@@ -1,10 +1,13 @@
 package com.sedin.presales.application.service;
 
+import com.sedin.presales.application.dto.CompareViewDto;
 import com.sedin.presales.application.dto.CreateDocumentMetadataRequest;
 import com.sedin.presales.application.dto.CreateDocumentRequest;
 import com.sedin.presales.application.dto.DocumentDetailDto;
+import com.sedin.presales.application.dto.DocumentDownloadDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
+import com.sedin.presales.application.dto.DocumentViewDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.exception.BadRequestException;
@@ -20,7 +23,10 @@ import com.sedin.presales.domain.entity.Industry;
 import com.sedin.presales.domain.entity.Technology;
 import com.sedin.presales.domain.entity.BusinessUnit;
 import com.sedin.presales.domain.entity.Sbu;
+import com.sedin.presales.domain.entity.Rendition;
 import com.sedin.presales.domain.enums.DocumentStatus;
+import com.sedin.presales.domain.enums.RenditionStatus;
+import com.sedin.presales.domain.enums.RenditionType;
 import com.sedin.presales.domain.repository.DocumentMetadataRepository;
 import com.sedin.presales.domain.repository.DocumentRepository;
 import com.sedin.presales.domain.repository.DocumentTypeRepository;
@@ -30,6 +36,7 @@ import com.sedin.presales.domain.repository.FolderRepository;
 import com.sedin.presales.domain.repository.IndustryRepository;
 import com.sedin.presales.domain.repository.TechnologyRepository;
 import com.sedin.presales.domain.repository.BusinessUnitRepository;
+import com.sedin.presales.domain.repository.RenditionRepository;
 import com.sedin.presales.domain.repository.SbuRepository;
 import com.sedin.presales.infrastructure.storage.BlobStorageService;
 import jakarta.persistence.criteria.Predicate;
@@ -42,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,6 +62,7 @@ import java.util.UUID;
 public class DocumentService {
 
     private static final String CONTAINER_NAME = "documents";
+    private static final String RENDITIONS_CONTAINER = "renditions";
 
     private final DocumentRepository documentRepository;
     private final DocumentMetadataRepository documentMetadataRepository;
@@ -65,8 +74,10 @@ public class DocumentService {
     private final TechnologyRepository technologyRepository;
     private final BusinessUnitRepository businessUnitRepository;
     private final SbuRepository sbuRepository;
+    private final RenditionRepository renditionRepository;
     private final BlobStorageService blobStorageService;
     private final DocumentMapper documentMapper;
+    private final RenditionService renditionService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentMetadataRepository documentMetadataRepository,
@@ -78,8 +89,10 @@ public class DocumentService {
                            TechnologyRepository technologyRepository,
                            BusinessUnitRepository businessUnitRepository,
                            SbuRepository sbuRepository,
+                           RenditionRepository renditionRepository,
                            BlobStorageService blobStorageService,
-                           DocumentMapper documentMapper) {
+                           DocumentMapper documentMapper,
+                           RenditionService renditionService) {
         this.documentRepository = documentRepository;
         this.documentMetadataRepository = documentMetadataRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -90,8 +103,10 @@ public class DocumentService {
         this.technologyRepository = technologyRepository;
         this.businessUnitRepository = businessUnitRepository;
         this.sbuRepository = sbuRepository;
+        this.renditionRepository = renditionRepository;
         this.blobStorageService = blobStorageService;
         this.documentMapper = documentMapper;
+        this.renditionService = renditionService;
     }
 
     @Transactional
@@ -148,7 +163,10 @@ public class DocumentService {
                 .fileSize(file.getSize())
                 .contentType(file.getContentType())
                 .build();
-        documentVersionRepository.save(version);
+        DocumentVersion savedVersion = documentVersionRepository.save(version);
+
+        // Trigger async PDF rendition generation
+        renditionService.generatePdfRendition(savedVersion.getId());
 
         // Create document metadata if provided
         if (request.getMetadata() != null) {
@@ -310,6 +328,9 @@ public class DocumentService {
         document.setCurrentVersionNumber(newVersionNumber);
         documentRepository.save(document);
 
+        // Trigger async PDF rendition generation
+        renditionService.generatePdfRendition(savedVersion.getId());
+
         log.info("Uploaded version {} for document: {}", newVersionNumber, documentId);
         return documentMapper.toVersionDto(savedVersion);
     }
@@ -336,6 +357,121 @@ public class DocumentService {
     public DocumentVersion getDocumentVersion(UUID documentId, Integer versionNumber) {
         return documentVersionRepository.findByDocumentIdAndVersionNumber(documentId, versionNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber", versionNumber));
+    }
+
+    public DocumentViewDto getViewUrl(UUID documentId) {
+        log.info("Getting view URL for document: {}", documentId);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document", "id", documentId));
+
+        DocumentVersion version = documentVersionRepository
+                .findByDocumentIdAndVersionNumber(documentId, document.getCurrentVersionNumber())
+                .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber",
+                        document.getCurrentVersionNumber()));
+
+        return buildViewDtoForVersion(documentId, version);
+    }
+
+    public CompareViewDto getCompareUrls(UUID documentId, int version1, int version2) {
+        log.info("Getting compare URLs for document: {}, versions {} and {}", documentId, version1, version2);
+
+        if (!documentRepository.existsById(documentId)) {
+            throw new ResourceNotFoundException("Document", "id", documentId);
+        }
+
+        DocumentVersion docVersion1 = documentVersionRepository
+                .findByDocumentIdAndVersionNumber(documentId, version1)
+                .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber", version1));
+
+        DocumentVersion docVersion2 = documentVersionRepository
+                .findByDocumentIdAndVersionNumber(documentId, version2)
+                .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber", version2));
+
+        CompareViewDto.CompareViewDtoBuilder builder = CompareViewDto.builder()
+                .documentId(documentId)
+                .version1Number(version1)
+                .version2Number(version2);
+
+        // Get rendition for version 1
+        renditionRepository.findByDocumentVersionIdAndRenditionType(docVersion1.getId(), RenditionType.PDF)
+                .ifPresentOrElse(rendition -> {
+                    if (rendition.getStatus() == RenditionStatus.COMPLETED) {
+                        builder.version1Url(blobStorageService.generateSasUrl(
+                                RENDITIONS_CONTAINER, rendition.getFilePath(), Duration.ofHours(1)));
+                        builder.version1Status("COMPLETED");
+                    } else {
+                        builder.version1Status(rendition.getStatus().name());
+                    }
+                }, () -> builder.version1Status("NOT_AVAILABLE"));
+
+        // Get rendition for version 2
+        renditionRepository.findByDocumentVersionIdAndRenditionType(docVersion2.getId(), RenditionType.PDF)
+                .ifPresentOrElse(rendition -> {
+                    if (rendition.getStatus() == RenditionStatus.COMPLETED) {
+                        builder.version2Url(blobStorageService.generateSasUrl(
+                                RENDITIONS_CONTAINER, rendition.getFilePath(), Duration.ofHours(1)));
+                        builder.version2Status("COMPLETED");
+                    } else {
+                        builder.version2Status(rendition.getStatus().name());
+                    }
+                }, () -> builder.version2Status("NOT_AVAILABLE"));
+
+        return builder.build();
+    }
+
+    public DocumentDownloadDto getDownloadUrl(UUID documentId) {
+        log.info("Getting download URL for document: {}", documentId);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document", "id", documentId));
+
+        DocumentVersion version = documentVersionRepository
+                .findByDocumentIdAndVersionNumber(documentId, document.getCurrentVersionNumber())
+                .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber",
+                        document.getCurrentVersionNumber()));
+
+        String downloadUrl = blobStorageService.generateSasUrl(
+                CONTAINER_NAME, version.getFilePath(), Duration.ofHours(1));
+
+        return DocumentDownloadDto.builder()
+                .documentId(documentId)
+                .versionNumber(version.getVersionNumber())
+                .downloadUrl(downloadUrl)
+                .fileName(version.getFileName())
+                .contentType(version.getContentType())
+                .fileSize(version.getFileSize())
+                .build();
+    }
+
+    private DocumentViewDto buildViewDtoForVersion(UUID documentId, DocumentVersion version) {
+        return renditionRepository
+                .findByDocumentVersionIdAndRenditionType(version.getId(), RenditionType.PDF)
+                .map(rendition -> {
+                    if (rendition.getStatus() == RenditionStatus.COMPLETED) {
+                        String sasUrl = blobStorageService.generateSasUrl(
+                                RENDITIONS_CONTAINER, rendition.getFilePath(), Duration.ofHours(1));
+                        return DocumentViewDto.builder()
+                                .documentId(documentId)
+                                .versionNumber(version.getVersionNumber())
+                                .viewUrl(sasUrl)
+                                .contentType("application/pdf")
+                                .status("COMPLETED")
+                                .build();
+                    } else {
+                        return DocumentViewDto.builder()
+                                .documentId(documentId)
+                                .versionNumber(version.getVersionNumber())
+                                .contentType("application/pdf")
+                                .status(rendition.getStatus().name())
+                                .message("PDF rendition is " + rendition.getStatus().name().toLowerCase())
+                                .build();
+                    }
+                })
+                .orElse(DocumentViewDto.builder()
+                        .documentId(documentId)
+                        .versionNumber(version.getVersionNumber())
+                        .status("NOT_AVAILABLE")
+                        .message("PDF rendition is not available for this document version")
+                        .build());
     }
 
     private String buildBlobPath(UUID documentId, int versionNumber, String fileName) {
