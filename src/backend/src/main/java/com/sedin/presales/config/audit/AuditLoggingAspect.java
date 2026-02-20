@@ -37,23 +37,33 @@ public class AuditLoggingAspect {
 
     @Around("@annotation(audited)")
     public Object around(ProceedingJoinPoint joinPoint, Audited audited) throws Throwable {
-        // Execute the target method first so audit logging does not delay the response
-        Object result = joinPoint.proceed();
+        String userEmail = resolveUserEmail();
+        String action = audited.action();
+        String resourceType = audited.resourceType();
+        UUID resourceId = extractResourceId(joinPoint);
+        String ipAddress = resolveIpAddress();
 
-        // Fire-and-forget: audit logging must never break the request
         try {
-            String userEmail = resolveUserEmail();
-            String action = audited.action();
-            String resourceType = audited.resourceType();
-            UUID resourceId = extractResourceId(joinPoint);
-            String ipAddress = resolveIpAddress();
+            Object result = joinPoint.proceed();
 
-            auditLogService.log(userEmail, action, resourceType, resourceId, ipAddress, null);
-        } catch (Exception ex) {
-            log.warn("Failed to write audit log for action={}: {}", audited.action(), ex.getMessage());
+            // Log successful operation
+            try {
+                auditLogService.log(userEmail, action, resourceType, resourceId, ipAddress, null);
+            } catch (Exception ex) {
+                log.warn("Failed to write audit log for action={}: {}", action, ex.getMessage());
+            }
+
+            return result;
+        } catch (Throwable ex) {
+            // Log failed operation
+            try {
+                String details = "FAILED: " + ex.getClass().getSimpleName();
+                auditLogService.log(userEmail, action, resourceType, resourceId, ipAddress, details);
+            } catch (Exception auditEx) {
+                log.warn("Failed to write audit log for failed action={}: {}", action, auditEx.getMessage());
+            }
+            throw ex;
         }
-
-        return result;
     }
 
     /**

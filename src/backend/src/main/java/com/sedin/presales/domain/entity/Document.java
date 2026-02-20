@@ -13,6 +13,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -42,10 +43,12 @@ public class Document extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private DocumentStatus status;
+    @Builder.Default
+    private DocumentStatus status = DocumentStatus.ACTIVE;
 
     @Column(name = "rag_indexed")
-    private Boolean ragIndexed;
+    @Builder.Default
+    private Boolean ragIndexed = false;
 
     @Column(name = "current_version_number")
     private Integer currentVersionNumber;

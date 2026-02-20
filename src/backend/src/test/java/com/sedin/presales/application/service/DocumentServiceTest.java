@@ -261,9 +261,19 @@ class DocumentServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    private void mockAdminUser() {
+        UserPrincipal admin = UserPrincipal.builder()
+                .userId(UUID.randomUUID().toString())
+                .email("admin@test.com")
+                .role("ADMIN")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+    }
+
     @Test
     @DisplayName("update should update document fields partially")
     void update_shouldUpdateFields() {
+        mockAdminUser();
         UUID id = UUID.randomUUID();
         Document document = Document.builder()
                 .title("Old Title")
@@ -297,6 +307,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("delete should set document status to ARCHIVED")
     void delete_shouldSetStatusToArchived() {
+        mockAdminUser();
         UUID id = UUID.randomUUID();
         Document document = Document.builder()
                 .title("To Be Archived")
@@ -316,6 +327,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("uploadNewVersion should increment version number")
     void uploadNewVersion_shouldIncrementVersionNumber() throws IOException {
+        mockAdminUser();
         UUID docId = UUID.randomUUID();
         Document document = Document.builder()
                 .title("Test Document")

@@ -10,6 +10,7 @@ import com.sedin.presales.application.dto.DocumentVersionDto;
 import com.sedin.presales.application.dto.DocumentViewDto;
 import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
+import com.sedin.presales.application.exception.AccessDeniedException;
 import com.sedin.presales.application.exception.BadRequestException;
 import com.sedin.presales.application.exception.ResourceNotFoundException;
 import com.sedin.presales.application.mapper.DocumentMapper;
@@ -162,7 +163,7 @@ public class DocumentService {
             );
         } catch (IOException e) {
             log.error("Failed to upload file to blob storage", e);
-            throw new BadRequestException("Failed to upload file: " + e.getMessage());
+            throw new BadRequestException("Failed to upload file. Please try again.");
         }
 
         // Create document version
@@ -273,6 +274,7 @@ public class DocumentService {
     @Transactional
     public DocumentDto update(UUID id, UpdateDocumentRequest request) {
         log.info("Updating document with id: {}", id);
+        enforceWriteAccess(id);
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
 
@@ -318,6 +320,7 @@ public class DocumentService {
     @Transactional
     public void delete(UUID id) {
         log.info("Soft deleting document with id: {}", id);
+        enforceWriteAccess(id);
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
 
@@ -334,6 +337,7 @@ public class DocumentService {
             throw new BadRequestException("File is required");
         }
 
+        enforceWriteAccess(documentId);
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", documentId));
 
@@ -351,7 +355,7 @@ public class DocumentService {
             );
         } catch (IOException e) {
             log.error("Failed to upload file to blob storage", e);
-            throw new BadRequestException("Failed to upload file: " + e.getMessage());
+            throw new BadRequestException("Failed to upload file. Please try again.");
         }
 
         // Create new document version
@@ -513,6 +517,18 @@ public class DocumentService {
                         .status("NOT_AVAILABLE")
                         .message("PDF rendition is not available for this document version")
                         .build());
+    }
+
+    private void enforceWriteAccess(UUID documentId) {
+        UserPrincipal user = currentUserService.getCurrentUser();
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            return;
+        }
+        boolean hasAccess = aclService.hasPermission(
+                UUID.fromString(user.getUserId()), ResourceType.DOCUMENT, documentId, Permission.WRITE);
+        if (!hasAccess) {
+            throw new AccessDeniedException("You do not have write access to this document");
+        }
     }
 
     private String buildBlobPath(UUID documentId, int versionNumber, String fileName) {

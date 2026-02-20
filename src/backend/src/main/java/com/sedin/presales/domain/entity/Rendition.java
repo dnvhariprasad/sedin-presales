@@ -42,7 +42,7 @@ public class Rendition {
     @Column(name = "rendition_type", nullable = false)
     private RenditionType renditionType;
 
-    @Column(name = "file_path")
+    @Column(name = "file_path", nullable = false)
     private String filePath;
 
     @Column(name = "file_size")
@@ -50,7 +50,8 @@ public class Rendition {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private RenditionStatus status;
+    @Builder.Default
+    private RenditionStatus status = RenditionStatus.PENDING;
 
     @Column(name = "error_message")
     private String errorMessage;

@@ -30,7 +30,7 @@ public class User extends BaseEntity {
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-    @Column(name = "display_name")
+    @Column(name = "display_name", nullable = false)
     private String displayName;
 
     @Enumerated(EnumType.STRING)

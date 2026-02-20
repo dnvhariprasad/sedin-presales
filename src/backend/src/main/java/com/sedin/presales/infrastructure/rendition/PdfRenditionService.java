@@ -50,7 +50,7 @@ public class PdfRenditionService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to convert presentation to PDF", e);
-            throw new BadRequestException("Failed to convert presentation to PDF: " + e.getMessage());
+            throw new BadRequestException("Failed to convert presentation to PDF");
         }
     }
 
@@ -66,7 +66,7 @@ public class PdfRenditionService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to convert Word document to PDF", e);
-            throw new BadRequestException("Failed to convert Word document to PDF: " + e.getMessage());
+            throw new BadRequestException("Failed to convert Word document to PDF");
         }
     }
 
@@ -83,7 +83,7 @@ public class PdfRenditionService {
             throw e;
         } catch (Exception e) {
             log.error("Failed to convert spreadsheet to PDF", e);
-            throw new BadRequestException("Failed to convert spreadsheet to PDF: " + e.getMessage());
+            throw new BadRequestException("Failed to convert spreadsheet to PDF");
         }
     }
 
@@ -93,7 +93,7 @@ public class PdfRenditionService {
             return fileStream.readAllBytes();
         } catch (Exception e) {
             log.error("Failed to read PDF file", e);
-            throw new BadRequestException("Failed to read PDF file: " + e.getMessage());
+            throw new BadRequestException("Failed to read PDF file");
         }
     }
 }
