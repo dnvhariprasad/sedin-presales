@@ -10,13 +10,12 @@ import com.sedin.presales.application.dto.PagedResponse;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
 import com.sedin.presales.application.exception.GlobalExceptionHandler;
 import com.sedin.presales.application.service.DocumentService;
+import com.sedin.presales.config.JwtTokenProvider;
 import com.sedin.presales.config.TestSecurityConfig;
 import com.sedin.presales.domain.entity.DocumentVersion;
 import com.sedin.presales.domain.enums.DocumentStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -37,8 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value = DocumentController.class,
-        excludeAutoConfiguration = {OAuth2ResourceServerAutoConfiguration.class, OAuth2ClientAutoConfiguration.class})
+@WebMvcTest(DocumentController.class)
 @Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class DocumentControllerTest {
 
@@ -50,6 +48,9 @@ class DocumentControllerTest {
 
     @MockitoBean
     private DocumentService documentService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private final UUID testId = UUID.randomUUID();
     private final UUID documentTypeId = UUID.randomUUID();

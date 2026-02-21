@@ -5,11 +5,10 @@ import com.sedin.presales.application.dto.CreateFolderRequest;
 import com.sedin.presales.application.dto.FolderDto;
 import com.sedin.presales.application.exception.GlobalExceptionHandler;
 import com.sedin.presales.application.service.FolderService;
+import com.sedin.presales.config.JwtTokenProvider;
 import com.sedin.presales.config.TestSecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -27,8 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value = FolderController.class,
-        excludeAutoConfiguration = {OAuth2ResourceServerAutoConfiguration.class, OAuth2ClientAutoConfiguration.class})
+@WebMvcTest(FolderController.class)
 @Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class FolderControllerTest {
 
@@ -40,6 +38,9 @@ class FolderControllerTest {
 
     @MockitoBean
     private FolderService folderService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private final UUID testId = UUID.randomUUID();
 

@@ -47,6 +47,7 @@ import com.sedin.presales.domain.repository.SbuRepository;
 import com.sedin.presales.infrastructure.storage.BlobStorageService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -88,6 +89,7 @@ public class DocumentService {
     private final CurrentUserService currentUserService;
     private final AclService aclService;
     private final IndexingService indexingService;
+    private final CaseStudyValidationService caseStudyValidationService;
 
     public DocumentService(DocumentRepository documentRepository,
                            DocumentMetadataRepository documentMetadataRepository,
@@ -105,7 +107,8 @@ public class DocumentService {
                            RenditionService renditionService,
                            CurrentUserService currentUserService,
                            AclService aclService,
-                           IndexingService indexingService) {
+                           IndexingService indexingService,
+                           @Lazy CaseStudyValidationService caseStudyValidationService) {
         this.documentRepository = documentRepository;
         this.documentMetadataRepository = documentMetadataRepository;
         this.documentVersionRepository = documentVersionRepository;
@@ -123,6 +126,7 @@ public class DocumentService {
         this.currentUserService = currentUserService;
         this.aclService = aclService;
         this.indexingService = indexingService;
+        this.caseStudyValidationService = caseStudyValidationService;
     }
 
     @Transactional
@@ -183,6 +187,11 @@ public class DocumentService {
 
         // Trigger async PDF rendition generation
         renditionService.generatePdfRendition(savedVersion.getId());
+
+        // Trigger case study validation if document type is "Case Study"
+        if ("Case Study".equalsIgnoreCase(documentType.getName())) {
+            caseStudyValidationService.validateCaseStudy(savedVersion.getId());
+        }
 
         // Create document metadata if provided
         if (request.getMetadata() != null) {
@@ -270,6 +279,7 @@ public class DocumentService {
 
     public DocumentDetailDto getById(UUID id) {
         log.debug("Getting document with id: {}", id);
+        enforceReadAccess(id);
         Document document = documentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
         return documentMapper.toDetailDto(document);
@@ -380,6 +390,11 @@ public class DocumentService {
         // Trigger async PDF rendition generation
         renditionService.generatePdfRendition(savedVersion.getId());
 
+        // Trigger case study validation if document type is "Case Study"
+        if ("Case Study".equalsIgnoreCase(document.getDocumentType().getName())) {
+            caseStudyValidationService.validateCaseStudy(savedVersion.getId());
+        }
+
         // Re-index if document was previously indexed
         if (Boolean.TRUE.equals(document.getRagIndexed())) {
             indexingService.indexDocument(documentId);
@@ -396,12 +411,13 @@ public class DocumentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", id));
 
         boolean newState = !Boolean.TRUE.equals(document.getRagIndexed());
-        document.setRagIndexed(newState);
-        documentRepository.save(document);
 
         if (newState) {
+            // Don't set ragIndexed=true yet — IndexingService will set it on success
             indexingService.indexDocument(id);
         } else {
+            document.setRagIndexed(false);
+            documentRepository.save(document);
             indexingService.removeFromIndex(id);
         }
 
@@ -415,6 +431,7 @@ public class DocumentService {
 
     public List<DocumentVersionDto> getVersions(UUID documentId) {
         log.debug("Getting versions for document: {}", documentId);
+        enforceReadAccess(documentId);
         if (!documentRepository.existsById(documentId)) {
             throw new ResourceNotFoundException("Document", "id", documentId);
         }
@@ -426,6 +443,7 @@ public class DocumentService {
 
     public InputStream downloadVersion(UUID documentId, Integer versionNumber) {
         log.info("Downloading version {} for document: {}", versionNumber, documentId);
+        enforceReadAccess(documentId);
         DocumentVersion version = documentVersionRepository.findByDocumentIdAndVersionNumber(documentId, versionNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("DocumentVersion", "versionNumber", versionNumber));
 
@@ -439,6 +457,7 @@ public class DocumentService {
 
     public DocumentViewDto getViewUrl(UUID documentId) {
         log.info("Getting view URL for document: {}", documentId);
+        enforceReadAccess(documentId);
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", documentId));
 
@@ -452,6 +471,7 @@ public class DocumentService {
 
     public CompareViewDto getCompareUrls(UUID documentId, int version1, int version2) {
         log.info("Getting compare URLs for document: {}, versions {} and {}", documentId, version1, version2);
+        enforceReadAccess(documentId);
 
         if (!documentRepository.existsById(documentId)) {
             throw new ResourceNotFoundException("Document", "id", documentId);
@@ -499,6 +519,7 @@ public class DocumentService {
 
     public DocumentDownloadDto getDownloadUrl(UUID documentId) {
         log.info("Getting download URL for document: {}", documentId);
+        enforceReadAccess(documentId);
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document", "id", documentId));
 
@@ -550,6 +571,22 @@ public class DocumentService {
                         .status("NOT_AVAILABLE")
                         .message("PDF rendition is not available for this document version")
                         .build());
+    }
+
+    public void checkReadAccess(UUID documentId) {
+        enforceReadAccess(documentId);
+    }
+
+    private void enforceReadAccess(UUID documentId) {
+        UserPrincipal user = currentUserService.getCurrentUser();
+        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            return;
+        }
+        boolean hasAccess = aclService.hasPermission(
+                UUID.fromString(user.getUserId()), ResourceType.DOCUMENT, documentId, Permission.READ);
+        if (!hasAccess) {
+            throw new AccessDeniedException("You do not have read access to this document");
+        }
     }
 
     private void enforceWriteAccess(UUID documentId) {

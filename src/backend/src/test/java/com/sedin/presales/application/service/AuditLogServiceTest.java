@@ -1,7 +1,10 @@
 package com.sedin.presales.application.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sedin.presales.domain.entity.AuditLog;
+import com.sedin.presales.domain.entity.User;
 import com.sedin.presales.domain.repository.AuditLogRepository;
+import com.sedin.presales.domain.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,10 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +27,12 @@ class AuditLogServiceTest {
 
     @Mock
     private AuditLogRepository auditLogRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private AuditLogService auditLogService;
@@ -36,6 +47,7 @@ class AuditLogServiceTest {
         String ipAddress = "192.168.1.1";
         String details = "{\"title\":\"Test Document\"}";
 
+        when(userRepository.findByEmail(userEmail)).thenReturn(Optional.empty());
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));
 
         auditLogService.log(userEmail, action, resourceType, resourceId, ipAddress, details);
@@ -60,6 +72,7 @@ class AuditLogServiceTest {
         String resourceType = "DOCUMENT";
         String ipAddress = "10.0.0.1";
 
+        when(userRepository.findByEmail(userEmail)).thenReturn(Optional.empty());
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));
 
         auditLogService.log(userEmail, action, resourceType, null, ipAddress, null);
@@ -84,6 +97,7 @@ class AuditLogServiceTest {
         UUID resourceId = UUID.randomUUID();
         String ipAddress = "172.16.0.1";
 
+        when(userRepository.findByEmail(userEmail)).thenReturn(Optional.empty());
         when(auditLogRepository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));
 
         auditLogService.log(userEmail, action, resourceType, resourceId, ipAddress, null);

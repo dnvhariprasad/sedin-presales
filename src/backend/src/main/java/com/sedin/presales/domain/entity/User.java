@@ -44,6 +44,9 @@ public class User extends BaseEntity {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<AclEntry> aclEntries = new ArrayList<>();
 }

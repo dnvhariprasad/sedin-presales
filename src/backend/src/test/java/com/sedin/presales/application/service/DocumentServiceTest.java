@@ -1,18 +1,30 @@
 package com.sedin.presales.application.service;
 
+import com.sedin.presales.application.dto.CompareViewDto;
+import com.sedin.presales.application.dto.CreateDocumentMetadataRequest;
 import com.sedin.presales.application.dto.CreateDocumentRequest;
 import com.sedin.presales.application.dto.DocumentDetailDto;
+import com.sedin.presales.application.dto.DocumentDownloadDto;
 import com.sedin.presales.application.dto.DocumentDto;
 import com.sedin.presales.application.dto.DocumentVersionDto;
+import com.sedin.presales.application.dto.DocumentViewDto;
 import com.sedin.presales.application.dto.IndexToggleResponseDto;
 import com.sedin.presales.application.dto.UpdateDocumentRequest;
+import com.sedin.presales.application.exception.AccessDeniedException;
 import com.sedin.presales.application.exception.BadRequestException;
 import com.sedin.presales.application.exception.ResourceNotFoundException;
 import com.sedin.presales.application.mapper.DocumentMapper;
 import com.sedin.presales.domain.entity.Document;
+import com.sedin.presales.domain.entity.DocumentMetadata;
 import com.sedin.presales.domain.entity.DocumentType;
 import com.sedin.presales.domain.entity.DocumentVersion;
+import com.sedin.presales.domain.entity.Domain;
+import com.sedin.presales.domain.entity.Industry;
+import com.sedin.presales.domain.entity.Rendition;
+import com.sedin.presales.domain.entity.Technology;
 import com.sedin.presales.domain.enums.DocumentStatus;
+import com.sedin.presales.domain.enums.RenditionStatus;
+import com.sedin.presales.domain.enums.RenditionType;
 import com.sedin.presales.domain.repository.BusinessUnitRepository;
 import com.sedin.presales.domain.repository.DocumentMetadataRepository;
 import com.sedin.presales.domain.repository.DocumentRepository;
@@ -47,6 +59,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -119,6 +132,9 @@ class DocumentServiceTest {
 
     @Mock
     private IndexingService indexingService;
+
+    @Mock
+    private CaseStudyValidationService caseStudyValidationService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -232,6 +248,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("getById should return DocumentDetailDto when document exists")
     void getById_shouldReturnDetailDto() {
+        mockAdminUser();
         UUID id = UUID.randomUUID();
         Document document = Document.builder()
                 .title("Test Document")
@@ -258,6 +275,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("getById should throw ResourceNotFoundException when document not found")
     void getById_shouldThrowWhenNotFound() {
+        mockAdminUser();
         UUID id = UUID.randomUUID();
         when(documentRepository.findById(id)).thenReturn(Optional.empty());
 
@@ -333,10 +351,15 @@ class DocumentServiceTest {
     void uploadNewVersion_shouldIncrementVersionNumber() throws IOException {
         mockAdminUser();
         UUID docId = UUID.randomUUID();
+        DocumentType proposalType = DocumentType.builder()
+                .name("Proposal")
+                .isActive(true)
+                .build();
         Document document = Document.builder()
                 .title("Test Document")
                 .status(DocumentStatus.ACTIVE)
                 .currentVersionNumber(2)
+                .documentType(proposalType)
                 .build();
         document.setId(docId);
 
@@ -393,6 +416,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("getVersions should return list of version DTOs")
     void getVersions_shouldReturnVersionList() {
+        mockAdminUser();
         UUID docId = UUID.randomUUID();
 
         DocumentVersion v1 = DocumentVersion.builder()
@@ -433,6 +457,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("getVersions should throw ResourceNotFoundException when document not found")
     void getVersions_shouldThrowWhenDocumentNotFound() {
+        mockAdminUser();
         UUID docId = UUID.randomUUID();
         when(documentRepository.existsById(docId)).thenReturn(false);
 
@@ -443,6 +468,7 @@ class DocumentServiceTest {
     @Test
     @DisplayName("downloadVersion should return input stream")
     void downloadVersion_shouldReturnInputStream() {
+        mockAdminUser();
         UUID docId = UUID.randomUUID();
         int versionNumber = 1;
         String filePath = "documents/" + docId + "/1/file.pdf";
@@ -589,7 +615,6 @@ class DocumentServiceTest {
         document.setId(id);
 
         when(documentRepository.findById(id)).thenReturn(Optional.of(document));
-        when(documentRepository.save(any(Document.class))).thenReturn(document);
 
         IndexToggleResponseDto result = documentService.toggleRagIndex(id);
 
@@ -599,6 +624,8 @@ class DocumentServiceTest {
         assertThat(result.getMessage()).isEqualTo("Document queued for indexing");
         verify(indexingService).indexDocument(id);
         verify(indexingService, never()).removeFromIndex(any(UUID.class));
+        // ragIndexed is NOT set eagerly — IndexingService sets it on success
+        verify(documentRepository, never()).save(any(Document.class));
     }
 
     @Test
@@ -640,11 +667,16 @@ class DocumentServiceTest {
     void uploadNewVersion_shouldReindexWhenRagIndexed() throws IOException {
         mockAdminUser();
         UUID docId = UUID.randomUUID();
+        DocumentType proposalType = DocumentType.builder()
+                .name("Proposal")
+                .isActive(true)
+                .build();
         Document document = Document.builder()
                 .title("Test Document")
                 .status(DocumentStatus.ACTIVE)
                 .currentVersionNumber(1)
                 .ragIndexed(true)
+                .documentType(proposalType)
                 .build();
         document.setId(docId);
 
@@ -681,5 +713,687 @@ class DocumentServiceTest {
         documentService.uploadNewVersion(docId, file, "Updated content");
 
         verify(indexingService).indexDocument(docId);
+    }
+
+    // ==================== Testing Gap 1: Negative ACL tests for write operations ====================
+
+    @Test
+    @DisplayName("update should throw AccessDeniedException when non-admin user lacks WRITE permission")
+    void update_shouldThrowAccessDenied_whenUserLacksWritePermission() {
+        UUID docId = UUID.randomUUID();
+        UserPrincipal viewer = UserPrincipal.builder()
+                .userId(UUID.randomUUID().toString())
+                .email("viewer@sedin.com")
+                .role("VIEWER")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(viewer);
+        when(aclService.hasPermission(any(UUID.class), eq(ResourceType.DOCUMENT), eq(docId), eq(Permission.WRITE)))
+                .thenReturn(false);
+
+        UpdateDocumentRequest request = UpdateDocumentRequest.builder().title("New Title").build();
+
+        assertThatThrownBy(() -> documentService.update(docId, request))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("delete should throw AccessDeniedException when non-admin user lacks WRITE permission")
+    void delete_shouldThrowAccessDenied_whenUserLacksWritePermission() {
+        UUID docId = UUID.randomUUID();
+        UserPrincipal viewer = UserPrincipal.builder()
+                .userId(UUID.randomUUID().toString())
+                .email("viewer@sedin.com")
+                .role("VIEWER")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(viewer);
+        when(aclService.hasPermission(any(UUID.class), eq(ResourceType.DOCUMENT), eq(docId), eq(Permission.WRITE)))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> documentService.delete(docId))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("uploadNewVersion should throw AccessDeniedException when non-admin user lacks WRITE permission")
+    void uploadNewVersion_shouldThrowAccessDenied_whenUserLacksWritePermission() {
+        UUID docId = UUID.randomUUID();
+        UserPrincipal viewer = UserPrincipal.builder()
+                .userId(UUID.randomUUID().toString())
+                .email("viewer@sedin.com")
+                .role("VIEWER")
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(viewer);
+
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+
+        when(aclService.hasPermission(any(UUID.class), eq(ResourceType.DOCUMENT), eq(docId), eq(Permission.WRITE)))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> documentService.uploadNewVersion(docId, file, "notes"))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("update should succeed for ADMIN user without explicit ACL entry (admin bypass)")
+    void update_shouldSucceedForAdmin_withoutExplicitAclEntry() {
+        mockAdminUser();
+        UUID id = UUID.randomUUID();
+        Document document = Document.builder()
+                .title("Old Title")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+        document.setId(id);
+        document.setCreatedAt(Instant.now());
+        document.setUpdatedAt(Instant.now());
+
+        UpdateDocumentRequest request = UpdateDocumentRequest.builder()
+                .title("Admin Updated Title")
+                .build();
+
+        DocumentDto documentDto = DocumentDto.builder()
+                .id(id)
+                .title("Admin Updated Title")
+                .build();
+
+        when(documentRepository.findById(id)).thenReturn(Optional.of(document));
+        when(documentRepository.save(any(Document.class))).thenReturn(document);
+        when(documentMapper.toDto(document)).thenReturn(documentDto);
+
+        DocumentDto result = documentService.update(id, request);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getTitle()).isEqualTo("Admin Updated Title");
+        // Admin should NOT trigger ACL permission check
+        verify(aclService, never()).hasPermission(any(UUID.class), any(ResourceType.class), any(UUID.class), any(Permission.class));
+    }
+
+    // ==================== Testing Gap 2: Metadata-path tests for populateMetadata ====================
+
+    @Test
+    @DisplayName("upload with valid metadata should save document metadata")
+    void upload_withValidMetadata_shouldSaveDocumentMetadata() throws IOException {
+        UUID docTypeId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        UUID domainId = UUID.randomUUID();
+        UUID industryId = UUID.randomUUID();
+        UUID techId1 = UUID.randomUUID();
+        UUID techId2 = UUID.randomUUID();
+
+        DocumentType documentType = DocumentType.builder()
+                .name("Proposal")
+                .isActive(true)
+                .build();
+        documentType.setId(docTypeId);
+
+        Domain domain = Domain.builder().name("Cloud").build();
+        domain.setId(domainId);
+
+        Industry industry = Industry.builder().name("Healthcare").build();
+        industry.setId(industryId);
+
+        Technology tech1 = Technology.builder().name("Java").build();
+        tech1.setId(techId1);
+        Technology tech2 = Technology.builder().name("React").build();
+        tech2.setId(techId2);
+
+        CreateDocumentMetadataRequest metadataRequest = CreateDocumentMetadataRequest.builder()
+                .domainId(domainId)
+                .industryId(industryId)
+                .technologyIds(List.of(techId1, techId2))
+                .build();
+
+        CreateDocumentRequest request = CreateDocumentRequest.builder()
+                .title("Test Document")
+                .customerName("Acme Corp")
+                .documentDate(LocalDate.now())
+                .documentTypeId(docTypeId)
+                .metadata(metadataRequest)
+                .build();
+
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getSize()).thenReturn(1024L);
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        Document savedDocument = Document.builder()
+                .title("Test Document")
+                .customerName("Acme Corp")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .documentType(documentType)
+                .build();
+        savedDocument.setId(docId);
+        savedDocument.setCreatedAt(Instant.now());
+        savedDocument.setUpdatedAt(Instant.now());
+
+        DocumentVersion savedVersion = DocumentVersion.builder()
+                .document(savedDocument)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .fileSize(1024L)
+                .contentType("application/pdf")
+                .build();
+        savedVersion.setId(UUID.randomUUID());
+
+        DocumentDto documentDto = DocumentDto.builder()
+                .id(docId)
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+
+        when(documentTypeRepository.findById(docTypeId)).thenReturn(Optional.of(documentType));
+        when(documentRepository.save(any(Document.class))).thenReturn(savedDocument);
+        when(blobStorageService.upload(anyString(), anyString(), any(InputStream.class), anyLong(), anyString()))
+                .thenReturn("https://blob.storage/documents/test.pdf");
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenReturn(savedVersion);
+        when(documentMapper.toDto(savedDocument)).thenReturn(documentDto);
+        when(domainRepository.findById(domainId)).thenReturn(Optional.of(domain));
+        when(industryRepository.findById(industryId)).thenReturn(Optional.of(industry));
+        when(technologyRepository.findAllById(List.of(techId1, techId2))).thenReturn(List.of(tech1, tech2));
+
+        DocumentDto result = documentService.upload(file, request);
+
+        assertThat(result).isNotNull();
+        verify(documentMetadataRepository).save(any(DocumentMetadata.class));
+    }
+
+    @Test
+    @DisplayName("upload with invalid technologyIds should throw BadRequestException")
+    void upload_withInvalidTechnologyIds_shouldThrowBadRequest() throws IOException {
+        UUID docTypeId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        UUID techId1 = UUID.randomUUID();
+        UUID techId2 = UUID.randomUUID();
+
+        DocumentType documentType = DocumentType.builder()
+                .name("Proposal")
+                .isActive(true)
+                .build();
+        documentType.setId(docTypeId);
+
+        Technology tech1 = Technology.builder().name("Java").build();
+        tech1.setId(techId1);
+
+        CreateDocumentMetadataRequest metadataRequest = CreateDocumentMetadataRequest.builder()
+                .technologyIds(List.of(techId1, techId2))
+                .build();
+
+        CreateDocumentRequest request = CreateDocumentRequest.builder()
+                .title("Test Document")
+                .customerName("Acme Corp")
+                .documentDate(LocalDate.now())
+                .documentTypeId(docTypeId)
+                .metadata(metadataRequest)
+                .build();
+
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getSize()).thenReturn(1024L);
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        Document savedDocument = Document.builder()
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .documentType(documentType)
+                .build();
+        savedDocument.setId(docId);
+        savedDocument.setCreatedAt(Instant.now());
+        savedDocument.setUpdatedAt(Instant.now());
+
+        DocumentVersion savedVersion = DocumentVersion.builder()
+                .document(savedDocument)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .fileSize(1024L)
+                .contentType("application/pdf")
+                .build();
+        savedVersion.setId(UUID.randomUUID());
+
+        when(documentTypeRepository.findById(docTypeId)).thenReturn(Optional.of(documentType));
+        when(documentRepository.save(any(Document.class))).thenReturn(savedDocument);
+        when(blobStorageService.upload(anyString(), anyString(), any(InputStream.class), anyLong(), anyString()))
+                .thenReturn("https://blob.storage/documents/test.pdf");
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenReturn(savedVersion);
+        // Return only 1 technology when 2 were requested - should trigger BadRequestException
+        when(technologyRepository.findAllById(List.of(techId1, techId2))).thenReturn(List.of(tech1));
+
+        assertThatThrownBy(() -> documentService.upload(file, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("technology IDs are invalid");
+    }
+
+    @Test
+    @DisplayName("update with metadata when existing metadata exists should update metadata")
+    void update_withMetadata_whenExistingMetadataExists_shouldUpdateMetadata() {
+        mockAdminUser();
+        UUID id = UUID.randomUUID();
+        UUID domainId = UUID.randomUUID();
+
+        Document document = Document.builder()
+                .title("Old Title")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+        document.setId(id);
+        document.setCreatedAt(Instant.now());
+        document.setUpdatedAt(Instant.now());
+
+        Domain domain = Domain.builder().name("Cloud").build();
+        domain.setId(domainId);
+
+        DocumentMetadata existingMetadata = DocumentMetadata.builder()
+                .document(document)
+                .build();
+        existingMetadata.setId(UUID.randomUUID());
+
+        CreateDocumentMetadataRequest metadataRequest = CreateDocumentMetadataRequest.builder()
+                .domainId(domainId)
+                .build();
+
+        UpdateDocumentRequest request = UpdateDocumentRequest.builder()
+                .title("New Title")
+                .metadata(metadataRequest)
+                .build();
+
+        DocumentDto documentDto = DocumentDto.builder()
+                .id(id)
+                .title("New Title")
+                .build();
+
+        when(documentRepository.findById(id)).thenReturn(Optional.of(document));
+        when(documentMetadataRepository.findByDocumentId(id)).thenReturn(Optional.of(existingMetadata));
+        when(domainRepository.findById(domainId)).thenReturn(Optional.of(domain));
+        when(documentRepository.save(any(Document.class))).thenReturn(document);
+        when(documentMapper.toDto(document)).thenReturn(documentDto);
+
+        DocumentDto result = documentService.update(id, request);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getTitle()).isEqualTo("New Title");
+        verify(documentMetadataRepository).save(any(DocumentMetadata.class));
+    }
+
+    @Test
+    @DisplayName("upload without metadata (null) should NOT save document metadata")
+    void upload_withoutMetadata_shouldNotSaveDocumentMetadata() throws IOException {
+        UUID docTypeId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+
+        DocumentType documentType = DocumentType.builder()
+                .name("Proposal")
+                .isActive(true)
+                .build();
+        documentType.setId(docTypeId);
+
+        CreateDocumentRequest request = CreateDocumentRequest.builder()
+                .title("Test Document")
+                .customerName("Acme Corp")
+                .documentDate(LocalDate.now())
+                .documentTypeId(docTypeId)
+                .build(); // No metadata
+
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getSize()).thenReturn(1024L);
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        Document savedDocument = Document.builder()
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .documentType(documentType)
+                .build();
+        savedDocument.setId(docId);
+        savedDocument.setCreatedAt(Instant.now());
+        savedDocument.setUpdatedAt(Instant.now());
+
+        DocumentVersion savedVersion = DocumentVersion.builder()
+                .document(savedDocument)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .fileSize(1024L)
+                .contentType("application/pdf")
+                .build();
+        savedVersion.setId(UUID.randomUUID());
+
+        DocumentDto documentDto = DocumentDto.builder()
+                .id(docId)
+                .title("Test Document")
+                .status(DocumentStatus.ACTIVE)
+                .build();
+
+        when(documentTypeRepository.findById(docTypeId)).thenReturn(Optional.of(documentType));
+        when(documentRepository.save(any(Document.class))).thenReturn(savedDocument);
+        when(blobStorageService.upload(anyString(), anyString(), any(InputStream.class), anyLong(), anyString()))
+                .thenReturn("https://blob.storage/documents/test.pdf");
+        when(documentVersionRepository.save(any(DocumentVersion.class))).thenReturn(savedVersion);
+        when(documentMapper.toDto(savedDocument)).thenReturn(documentDto);
+
+        DocumentDto result = documentService.upload(file, request);
+
+        assertThat(result).isNotNull();
+        verify(documentMetadataRepository, never()).save(any(DocumentMetadata.class));
+    }
+
+    // ==================== Testing Gap 3: Viewer/download/compare URL flow tests ====================
+
+    @Test
+    @DisplayName("getViewUrl should return correct DTO when PDF rendition is COMPLETED")
+    void getViewUrl_shouldReturnCompletedDto_whenRenditionCompleted() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+
+        Document document = Document.builder()
+                .title("Test Doc")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .build();
+        document.setId(docId);
+
+        DocumentVersion version = DocumentVersion.builder()
+                .document(document)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .build();
+        version.setId(versionId);
+
+        Rendition rendition = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.COMPLETED)
+                .filePath("renditions/" + docId + "/1/test.pdf")
+                .documentVersion(version)
+                .build();
+        rendition.setId(UUID.randomUUID());
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition));
+        when(blobStorageService.generateSasUrl(eq("renditions"), anyString(), any(Duration.class)))
+                .thenReturn("https://blob.storage/renditions/test.pdf?sas=token");
+
+        DocumentViewDto result = documentService.getViewUrl(docId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(docId);
+        assertThat(result.getVersionNumber()).isEqualTo(1);
+        assertThat(result.getStatus()).isEqualTo("COMPLETED");
+        assertThat(result.getViewUrl()).contains("sas=token");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+    }
+
+    @Test
+    @DisplayName("getViewUrl should return status PENDING when rendition is still processing")
+    void getViewUrl_shouldReturnPendingStatus_whenRenditionProcessing() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+
+        Document document = Document.builder()
+                .title("Test Doc")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .build();
+        document.setId(docId);
+
+        DocumentVersion version = DocumentVersion.builder()
+                .document(document)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .build();
+        version.setId(versionId);
+
+        Rendition rendition = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.PENDING)
+                .filePath("renditions/" + docId + "/1/test.pdf")
+                .documentVersion(version)
+                .build();
+        rendition.setId(UUID.randomUUID());
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition));
+
+        DocumentViewDto result = documentService.getViewUrl(docId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(docId);
+        assertThat(result.getStatus()).isEqualTo("PENDING");
+        assertThat(result.getViewUrl()).isNull();
+        assertThat(result.getMessage()).contains("pending");
+    }
+
+    @Test
+    @DisplayName("getViewUrl should return NOT_AVAILABLE when no rendition exists")
+    void getViewUrl_shouldReturnNotAvailable_whenNoRenditionExists() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+
+        Document document = Document.builder()
+                .title("Test Doc")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .build();
+        document.setId(docId);
+
+        DocumentVersion version = DocumentVersion.builder()
+                .document(document)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .build();
+        version.setId(versionId);
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId, RenditionType.PDF))
+                .thenReturn(Optional.empty());
+
+        DocumentViewDto result = documentService.getViewUrl(docId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(docId);
+        assertThat(result.getStatus()).isEqualTo("NOT_AVAILABLE");
+        assertThat(result.getViewUrl()).isNull();
+        assertThat(result.getMessage()).contains("not available");
+    }
+
+    @Test
+    @DisplayName("getDownloadUrl should return correct download URL with SAS token")
+    void getDownloadUrl_shouldReturnCorrectDownloadUrl() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+
+        Document document = Document.builder()
+                .title("Test Doc")
+                .status(DocumentStatus.ACTIVE)
+                .currentVersionNumber(1)
+                .build();
+        document.setId(docId);
+
+        DocumentVersion version = DocumentVersion.builder()
+                .document(document)
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .fileName("test.pdf")
+                .fileSize(2048L)
+                .contentType("application/pdf")
+                .build();
+        version.setId(UUID.randomUUID());
+
+        when(documentRepository.findById(docId)).thenReturn(Optional.of(document));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version));
+        when(blobStorageService.generateSasUrl(eq("documents"), anyString(), any(Duration.class)))
+                .thenReturn("https://blob.storage/documents/test.pdf?sas=download-token");
+
+        DocumentDownloadDto result = documentService.getDownloadUrl(docId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(docId);
+        assertThat(result.getVersionNumber()).isEqualTo(1);
+        assertThat(result.getDownloadUrl()).contains("sas=download-token");
+        assertThat(result.getFileName()).isEqualTo("test.pdf");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+        assertThat(result.getFileSize()).isEqualTo(2048L);
+    }
+
+    @Test
+    @DisplayName("getCompareUrls should return URLs for both versions when both renditions are completed")
+    void getCompareUrls_shouldReturnBothUrls_whenBothRenditionsCompleted() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        UUID versionId1 = UUID.randomUUID();
+        UUID versionId2 = UUID.randomUUID();
+
+        DocumentVersion version1 = DocumentVersion.builder()
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .build();
+        version1.setId(versionId1);
+
+        DocumentVersion version2 = DocumentVersion.builder()
+                .versionNumber(2)
+                .filePath("documents/" + docId + "/2/test.pdf")
+                .build();
+        version2.setId(versionId2);
+
+        Rendition rendition1 = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.COMPLETED)
+                .filePath("renditions/" + docId + "/1/test.pdf")
+                .build();
+
+        Rendition rendition2 = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.COMPLETED)
+                .filePath("renditions/" + docId + "/2/test.pdf")
+                .build();
+
+        when(documentRepository.existsById(docId)).thenReturn(true);
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version1));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 2))
+                .thenReturn(Optional.of(version2));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId1, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition1));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId2, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition2));
+        when(blobStorageService.generateSasUrl(eq("renditions"), eq("renditions/" + docId + "/1/test.pdf"), any(Duration.class)))
+                .thenReturn("https://blob.storage/renditions/v1.pdf?sas=token1");
+        when(blobStorageService.generateSasUrl(eq("renditions"), eq("renditions/" + docId + "/2/test.pdf"), any(Duration.class)))
+                .thenReturn("https://blob.storage/renditions/v2.pdf?sas=token2");
+
+        CompareViewDto result = documentService.getCompareUrls(docId, 1, 2);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getDocumentId()).isEqualTo(docId);
+        assertThat(result.getVersion1Number()).isEqualTo(1);
+        assertThat(result.getVersion2Number()).isEqualTo(2);
+        assertThat(result.getVersion1Status()).isEqualTo("COMPLETED");
+        assertThat(result.getVersion2Status()).isEqualTo("COMPLETED");
+        assertThat(result.getVersion1Url()).contains("sas=token1");
+        assertThat(result.getVersion2Url()).contains("sas=token2");
+    }
+
+    @Test
+    @DisplayName("getCompareUrls should handle one version completed and other pending")
+    void getCompareUrls_shouldHandleMixedStatuses() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        UUID versionId1 = UUID.randomUUID();
+        UUID versionId2 = UUID.randomUUID();
+
+        DocumentVersion version1 = DocumentVersion.builder()
+                .versionNumber(1)
+                .filePath("documents/" + docId + "/1/test.pdf")
+                .build();
+        version1.setId(versionId1);
+
+        DocumentVersion version2 = DocumentVersion.builder()
+                .versionNumber(2)
+                .filePath("documents/" + docId + "/2/test.pdf")
+                .build();
+        version2.setId(versionId2);
+
+        Rendition rendition1 = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.COMPLETED)
+                .filePath("renditions/" + docId + "/1/test.pdf")
+                .build();
+
+        Rendition rendition2 = Rendition.builder()
+                .renditionType(RenditionType.PDF)
+                .status(RenditionStatus.PENDING)
+                .filePath("renditions/" + docId + "/2/test.pdf")
+                .build();
+
+        when(documentRepository.existsById(docId)).thenReturn(true);
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 1))
+                .thenReturn(Optional.of(version1));
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, 2))
+                .thenReturn(Optional.of(version2));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId1, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition1));
+        when(renditionRepository.findByDocumentVersionIdAndRenditionType(versionId2, RenditionType.PDF))
+                .thenReturn(Optional.of(rendition2));
+        when(blobStorageService.generateSasUrl(eq("renditions"), eq("renditions/" + docId + "/1/test.pdf"), any(Duration.class)))
+                .thenReturn("https://blob.storage/renditions/v1.pdf?sas=token1");
+
+        CompareViewDto result = documentService.getCompareUrls(docId, 1, 2);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getVersion1Status()).isEqualTo("COMPLETED");
+        assertThat(result.getVersion1Url()).contains("sas=token1");
+        assertThat(result.getVersion2Status()).isEqualTo("PENDING");
+        assertThat(result.getVersion2Url()).isNull();
+    }
+
+    @Test
+    @DisplayName("downloadVersion should return InputStream from blob storage with ACL check")
+    void downloadVersion_shouldReturnInputStream_withAclCheck() {
+        mockAdminUser();
+        UUID docId = UUID.randomUUID();
+        int versionNumber = 2;
+        String filePath = "documents/" + docId + "/2/file.pdf";
+
+        DocumentVersion version = DocumentVersion.builder()
+                .document(Document.builder().build())
+                .versionNumber(versionNumber)
+                .filePath(filePath)
+                .fileName("file.pdf")
+                .build();
+        version.setId(UUID.randomUUID());
+
+        InputStream expectedStream = new ByteArrayInputStream("file-content".getBytes());
+
+        when(documentVersionRepository.findByDocumentIdAndVersionNumber(docId, versionNumber))
+                .thenReturn(Optional.of(version));
+        when(blobStorageService.download("documents", filePath)).thenReturn(expectedStream);
+
+        InputStream result = documentService.downloadVersion(docId, versionNumber);
+
+        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(expectedStream);
+        verify(blobStorageService).download("documents", filePath);
     }
 }

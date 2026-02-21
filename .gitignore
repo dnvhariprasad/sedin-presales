@@ -40,6 +40,9 @@ Thumbs.db
 # Azure
 infra/output/
 
+# Designs
+designs/
+
 # Build
 build/
 out/

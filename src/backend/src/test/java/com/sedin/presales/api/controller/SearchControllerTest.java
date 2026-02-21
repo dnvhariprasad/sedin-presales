@@ -7,12 +7,11 @@ import com.sedin.presales.application.dto.SearchResultDto;
 import com.sedin.presales.application.dto.SourceCitationDto;
 import com.sedin.presales.application.exception.GlobalExceptionHandler;
 import com.sedin.presales.application.service.SearchService;
+import com.sedin.presales.config.JwtTokenProvider;
 import com.sedin.presales.config.TestSecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -27,8 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value = SearchController.class,
-        excludeAutoConfiguration = {OAuth2ResourceServerAutoConfiguration.class, OAuth2ClientAutoConfiguration.class})
+@WebMvcTest(SearchController.class)
 @Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class SearchControllerTest {
 
@@ -40,6 +38,9 @@ class SearchControllerTest {
 
     @MockitoBean
     private SearchService searchService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private final UUID testDocumentId = UUID.randomUUID();
 

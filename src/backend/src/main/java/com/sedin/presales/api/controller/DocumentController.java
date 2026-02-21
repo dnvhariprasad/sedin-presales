@@ -75,7 +75,9 @@ public class DocumentController {
             @RequestParam(defaultValue = "20") int size) {
         log.debug("GET /api/v1/documents - folderId: {}, documentTypeId: {}, status: {}, search: {}, page: {}, size: {}",
                 folderId, documentTypeId, status, search, page, size);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        int safePage = Math.max(page, 0);
+        int cappedSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(safePage, cappedSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         PagedResponse<DocumentDto> documents = documentService.list(pageable, folderId, documentTypeId, status, search);
         return ResponseEntity.ok(ApiResponse.success(documents));
     }

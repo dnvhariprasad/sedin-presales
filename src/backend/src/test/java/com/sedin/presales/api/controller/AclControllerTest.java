@@ -6,13 +6,12 @@ import com.sedin.presales.application.dto.BulkGrantAccessRequest;
 import com.sedin.presales.application.dto.GrantAccessRequest;
 import com.sedin.presales.application.exception.GlobalExceptionHandler;
 import com.sedin.presales.application.service.AclService;
+import com.sedin.presales.config.JwtTokenProvider;
 import com.sedin.presales.config.TestSecurityConfig;
 import com.sedin.presales.domain.enums.Permission;
 import com.sedin.presales.domain.enums.ResourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration;
-import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -30,8 +29,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value = AclController.class,
-        excludeAutoConfiguration = {OAuth2ResourceServerAutoConfiguration.class, OAuth2ClientAutoConfiguration.class})
+@WebMvcTest(AclController.class)
 @Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class AclControllerTest {
 
@@ -43,6 +41,9 @@ class AclControllerTest {
 
     @MockitoBean
     private AclService aclService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     private final UUID testId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();

@@ -132,6 +132,15 @@ public class IndexingService {
 
         } catch (Exception e) {
             log.error("Failed to index document: {}", documentId, e);
+            try {
+                Document doc = documentRepository.findById(documentId).orElse(null);
+                if (doc != null) {
+                    doc.setRagIndexed(false);
+                    documentRepository.save(doc);
+                }
+            } catch (Exception rollbackEx) {
+                log.error("Failed to reset ragIndexed flag for document: {}", documentId, rollbackEx);
+            }
         }
     }
 

@@ -2,8 +2,11 @@ package com.sedin.presales.config;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Optional;
 
 @TestConfiguration
 public class TestSecurityConfig {
@@ -12,5 +15,10 @@ public class TestSecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
+    }
+
+    @Bean
+    public AuditorAware<String> auditorProvider() {
+        return () -> Optional.of("test-user@sedin.com");
     }
 }

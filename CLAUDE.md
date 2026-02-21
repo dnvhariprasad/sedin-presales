@@ -12,8 +12,8 @@ A Document Management System (DMS) for managing pre-sales assets (case studies, 
 - **Frontend:** React 18+ with TypeScript, Vite, shadcn/ui, TailwindCSS v4, TanStack Query
 - **Database:** Azure Database for PostgreSQL Flexible Server (B1ms, v16)
 - **File Storage:** Azure Blob Storage (Standard LRS, Hot tier)
-- **AI/RAG:** Azure AI Search, Azure OpenAI (GPT-4o-mini, text-embedding-3-small), Azure Document Intelligence, Spring AI
-- **Auth:** Microsoft Entra ID (Azure AD) with Spring Security OAuth2 + MSAL4J
+- **AI/RAG:** Azure AI Search, Azure OpenAI (GPT-4o-mini, text-embedding-3-small), Azure Document Intelligence, LangChain4j 0.36.2
+- **Auth:** DB-level email/password with BCrypt + JWT (jjwt 0.12.6), Spring Security
 - **PDF Rendition:** Aspose.Total for Java (license valid till Dec 2024, evaluation mode after)
 - **PPT Generation:** Aspose.Slides for Java
 - **DB Migrations:** Flyway
@@ -61,7 +61,7 @@ mvn -B clean compile -f src/backend/pom.xml
 # Run API locally (dev profile: ddl-auto=update, flyway disabled)
 mvn -B spring-boot:run -Dspring-boot.run.profiles=dev -f src/backend/pom.xml
 
-# Run all tests (139 tests)
+# Run all tests (248 tests)
 mvn -B test -f src/backend/pom.xml
 
 # Run single test class
@@ -71,10 +71,10 @@ mvn -B test -Dtest=MasterServiceTest -f src/backend/pom.xml
 mvn -B test -Dtest=MasterServiceTest#create_shouldSaveAndReturnDto -f src/backend/pom.xml
 
 # Run tests by category (service tests only)
-mvn -B test -Dtest="MasterServiceTest,FolderServiceTest,DocumentServiceTest,AclServiceTest,PermissionEvaluatorTest,IndexingServiceTest,SearchServiceTest" -f src/backend/pom.xml
+mvn -B test -Dtest="MasterServiceTest,FolderServiceTest,DocumentServiceTest,AclServiceTest,PermissionEvaluatorTest,IndexingServiceTest,SearchServiceTest,CaseStudyAgentServiceTest,CaseStudyValidationServiceTest,CaseStudyFormattingServiceTest,CaseStudyGenerationServiceTest,UserServiceTest,RenditionServiceTest,SummaryServiceTest,AuditLogServiceTest,AuthServiceTest" -f src/backend/pom.xml
 
 # Run tests by category (controller tests only)
-mvn -B test -Dtest="MasterControllerTest,FolderControllerTest,DocumentControllerTest,AclControllerTest,SearchControllerTest" -f src/backend/pom.xml
+mvn -B test -Dtest="MasterControllerTest,FolderControllerTest,DocumentControllerTest,AclControllerTest,SearchControllerTest,CaseStudyAgentControllerTest,CaseStudyControllerTest,UserControllerTest,AuditLogControllerTest,SummaryControllerTest,AuthControllerTest" -f src/backend/pom.xml
 
 # Package JAR for deployment
 mvn -B clean package -DskipTests -f src/backend/pom.xml
@@ -104,8 +104,6 @@ npm run lint         # ESLint
 | App Service (Frontend) | `sedin-presales-web` (Node 20) — `https://sedin-presales-web.azurewebsites.net` | centralus |
 | Azure Functions | `func-sedin-presales` (Java 21, on App Service plan) | centralus |
 
-**Note:** Entra ID app registration is pending — requires Azure AD admin permissions.
-
 **Note:** PostgreSQL, App Service, and Functions are in `centralus` because `eastus` has provisioning restrictions for these resource types on this subscription.
 
 ## Key Architecture Decisions
@@ -117,7 +115,8 @@ npm run lint         # ESLint
 - **RAG with ACL filtering:** Azure AI Search indexes only flagged documents. Query results filtered by user's ACL permissions before being sent to Azure OpenAI via REST API. Hybrid search (text + vector) with HNSW algorithm, 1536-dim embeddings (text-embedding-3-small). Admin toggles indexing per document via `PUT /api/v1/documents/{id}/index-toggle`.
 - **RAG Pipeline:** Download → Document Intelligence text extraction → chunk (~1000 chars, 100 overlap) → batch embed → push to Azure AI Search. Re-indexes on new version upload if `ragIndexed=true`. Async via `indexingExecutor` thread pool.
 - **Search API:** `POST /api/v1/search` with hybrid search, ACL post-filtering (fetch 3x topK, filter, trim), optional RAG answer via GPT-4o-mini with source citations.
-- **Case Study Agent:** Admin-configured templates stored in DB. Active agent runs on upload to validate/reformat case studies via Aspose.Slides for Java.
+- **Case Study Agent:** Admin-configured JSONB templates (TemplateConfig with branding, sections, positions, content rules) stored in `case_study_agents` table. LangChain4j 0.36.2 AI Services (Extractor, Validator, Enhancer) for content analysis. Upload pipeline: if document type is "Case Study", async validates via `CaseStudyValidationService` (extract PPT text → AI extract sections → AI validate → save result → trigger formatting if invalid). Wizard endpoint `POST /api/v1/case-studies/generate` creates PPT from structured input with optional AI enhancement. Async processing via `caseStudyExecutor` thread pool.
+- **DB-level Auth with JWT:** Users stored in `users` table with BCrypt-hashed passwords. Login via `POST /api/v1/auth/login` returns a JWT token (HS256, jjwt 0.12.6). `JwtAuthenticationFilter` validates Bearer tokens on all requests except `/api/v1/auth/**`. Claims include userId (sub), email, role, displayName. `CurrentUserService` extracts the authenticated `UserPrincipal` from `SecurityContextHolder`.
 - **No Docker:** All deployments are direct JAR/package deploys to Azure App Service. This is a hard requirement.
 - **Profiles:** `dev` profile disables Flyway, uses `ddl-auto: update`, enables DEBUG logging. Production uses Flyway with `ddl-auto: validate`.
 
@@ -130,7 +129,8 @@ Backend expects these in `application.yml` or as environment variables:
 - `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY`
 - `AZURE_SEARCH_ENDPOINT` / `AZURE_SEARCH_API_KEY`
 - `AZURE_DOC_INTELLIGENCE_ENDPOINT` / `AZURE_DOC_INTELLIGENCE_API_KEY`
-- `AZURE_TENANT_ID` — Entra ID tenant for JWT validation
+- `JWT_SECRET` — Secret key for signing JWT tokens (min 256 bits)
+- `JWT_EXPIRATION_MS` — JWT token expiration in milliseconds (default: 86400000 = 24h)
 
 All Azure connection strings/keys are saved in `infra/output/azure-resources.env` (gitignored).
 
@@ -140,7 +140,7 @@ All Azure connection strings/keys are saved in `infra/output/azure-resources.env
 - **Controller tests:** `@WebMvcTest` with `@MockitoBean` (Spring Boot 3.4+, NOT `@MockBean`). Import `TestSecurityConfig.class` + `GlobalExceptionHandler.class`.
 - **Infrastructure tests:** Mockito-based unit tests (e.g., BlobStorageServiceTest mocks BlobServiceClient chain).
 - **Assertions:** AssertJ (`assertThat`, `assertThatThrownBy`).
-- **Test security:** `TestSecurityConfig` in test config package disables CSRF and permits all. Also `excludeAutoConfiguration` for OAuth2 in `@WebMvcTest`.
+- **Test security:** `TestSecurityConfig` in test config package disables CSRF and permits all. Controller tests mock `JwtTokenProvider` via `@MockitoBean` so the JWT filter passes requests through without authentication.
 - Test file location mirrors main: `src/test/java/com/sedin/presales/{same package structure}`
 
 ## Conventions

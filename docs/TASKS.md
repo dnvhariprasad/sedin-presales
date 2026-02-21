@@ -136,31 +136,32 @@
 ## Phase 5: Case Study Agent (FR-032 to FR-043)
 
 ### 5A: Agent Configuration (Admin)
-- [ ] P5-01: Create `CaseStudyAgentService` — CRUD + set active agent
-- [ ] P5-02: Create `AgentController` — `POST/GET/PUT/DELETE /api/v1/admin/agents`
-- [ ] P5-03: Create `AgentController` — `POST /api/v1/admin/agents/{id}/activate`
-- [ ] P5-04: Design agent template config JSON schema (slide structure, sections, branding rules, required fields)
+- [x] P5-01: Create `CaseStudyAgentService` — CRUD + set active agent
+- [x] P5-02: Create `CaseStudyAgentController` — `POST/GET/PUT/DELETE /api/v1/admin/case-study-agents`
+- [x] P5-03: Create `CaseStudyAgentController` — `PUT /api/v1/admin/case-study-agents/{id}/activate` + deactivate
+- [x] P5-04: Design agent template config JSON schema (JSONB TemplateConfig with branding, sections, positions, content rules)
+- [x] P5-04b: Integrate LangChain4j 0.36.2 — ChatLanguageModel + 3 AI Service interfaces (Extractor, Validator, Enhancer)
 
 ### 5B: Auto-Validation on Upload
-- [ ] P5-05: Create `CaseStudyValidationService` — validate uploaded PPT against active agent's template
-- [ ] P5-06: Create `CaseStudyFormattingService` — reformat non-conforming PPT using Aspose.Slides
-- [ ] P5-07: Wire validation into case study upload pipeline (run after upload, before rendition)
-- [ ] P5-08: Store formatted rendition in `renditions` table (type: FORMATTED)
-- [ ] P5-09: Log validation results, expose via `GET /api/v1/documents/{id}/validation-results`
+- [x] P5-05: Create `CaseStudyValidationService` — async validate uploaded PPT against active agent's template (extract text → AI extract sections → AI validate → save result)
+- [x] P5-06: Create `CaseStudyFormattingService` — async reformat non-conforming PPT using Aspose.Slides + PptTemplateBuilder
+- [x] P5-07: Wire validation into case study upload pipeline (DocumentService triggers on "Case Study" document type)
+- [x] P5-08: Store formatted rendition in `renditions` table (type: FORMATTED) via PptTemplateBuilder
+- [x] P5-09: Create validation results — `CaseStudyValidationResult` entity + V15 migration + `GET /api/v1/case-studies/{id}/validation` + `POST .../revalidate`
 
 ### 5C: Case Study Creation Wizard
-- [ ] P5-10: Create `CaseStudyGenerationService` — generate PPT from structured input using Aspose.Slides + active template
-- [ ] P5-11: Create `POST /api/v1/case-studies/generate` — accept structured input, return generated document
-- [ ] P5-12: Use Azure OpenAI to enhance/polish user input before generating slides
+- [x] P5-10: Create `CaseStudyGenerationService` — synchronous wizard: build PPT from structured input using PptTemplateBuilder + active template
+- [x] P5-11: Create `POST /api/v1/case-studies/generate` — accept CaseStudyWizardRequest, return document ID + version ID
+- [x] P5-12: Integrate AI content enhancement via LangChain4j CaseStudyContentEnhancer (optional per request)
 
 ---
 
 ## Phase 6: Admin Module (FR-044 to FR-052)
 
-- [ ] P6-01: Create `UserService` — CRUD (create, update, deactivate, list users)
-- [ ] P6-02: Create `UserController` — `POST/GET/PUT/DELETE /api/v1/admin/users`
-- [ ] P6-03: Create `AuditLogService` — query audit logs with filters
-- [ ] P6-04: Create `AuditLogController` — `GET /api/v1/admin/audit-logs`
+- [x] P6-01: Create `UserService` — CRUD (create, update, activate, deactivate, list with Specification filters)
+- [x] P6-02: Create `UserController` — `/api/v1/admin/users` (list, getById, create, update, activate, deactivate) with @Audited
+- [x] P6-03: Expand `AuditLogService` — added paginated list with Specification filters (userEmail, action, resourceType, date range) + getById
+- [x] P6-04: Create `AuditLogController` — `/api/v1/admin/audit-logs` (list with filters, getById)
 
 ---
 
@@ -244,9 +245,9 @@
 
 ## Phase 14: Testing & Quality
 
-- [x] P14-01: Backend unit tests — services (MasterService, FolderService, DocumentService, AclService, PermissionEvaluator) — 48 tests
-- [x] P14-02: Backend controller tests — @WebMvcTest (MasterController, FolderController, DocumentController, AclController) — 29 tests
-- [x] P14-02b: Backend infra/util tests — GlobalExceptionHandler, DocumentMapper, BlobStorageService — 19 tests
+- [x] P14-01: Backend unit tests — services (Master, Folder, Document, Acl, PermissionEvaluator, Indexing, Search, CaseStudyAgent, CaseStudyValidation, CaseStudyFormatting, CaseStudyGeneration) — 180 total
+- [x] P14-02: Backend controller tests — @WebMvcTest (Master, Folder, Document, Acl, Search, CaseStudyAgent, CaseStudy)
+- [x] P14-02b: Backend infra/util tests — GlobalExceptionHandler, DocumentMapper, BlobStorage, Embedding, AzureSearch, PptTextExtractor, PptTemplateBuilder
 - [ ] P14-03: Backend integration tests — repository layer with Testcontainers (PostgreSQL)
 - [ ] P14-04: Frontend unit tests — React Testing Library for key components
 - [ ] P14-05: E2E tests — Playwright for critical flows (login → upload → view → search)
@@ -304,8 +305,8 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P2: DMS Core | 20 | 20 | 0 | 100% |
 | P3: Renditions | 14 | 14 | 0 | 100% |
 | P4: RAG & Search | 8 | 8 | 0 | 100% |
-| P5: CS Agent | 12 | 0 | 12 | 0% |
-| P6: Admin BE | 4 | 0 | 4 | 0% |
+| P5: CS Agent | 13 | 13 | 0 | 100% |
+| P6: Admin BE | 4 | 4 | 0 | 100% |
 | P7: FE Layout | 7 | 0 | 7 | 0% |
 | P8: FE Grid | 7 | 0 | 7 | 0% |
 | P9: FE Upload/Detail | 7 | 0 | 7 | 0% |
@@ -315,4 +316,4 @@ Phase 0 (Done) → Phase 1A (DB Schema) → Phase 1B (Entities)
 | P13: FE Admin | 5 | 0 | 5 | 0% |
 | P14: Testing | 7 | 3 | 4 | 43% |
 | P15: Deployment | 7 | 0 | 7 | 0% |
-| **TOTAL** | **157** | **86** | **71** | **55%** |
+| **TOTAL** | **158** | **103** | **55** | **65%** |
