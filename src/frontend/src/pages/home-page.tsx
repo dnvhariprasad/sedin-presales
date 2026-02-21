@@ -1,8 +1,7 @@
 import { useState } from "react"
 import { 
-  LogOut, 
-  Search, 
-  Sparkles, 
+  LogOut,
+  Sparkles,
   Upload, 
   Filter, 
   Download, 
