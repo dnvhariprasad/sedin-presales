@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { ProtectedRoute } from "@/features/auth"
 import { HomePage } from "@/pages/home-page"
 import { LoginPage } from "@/pages/login-page"
+import { MastersPage } from "@/pages/masters-page"
 
 function App() {
   return (
@@ -13,6 +14,14 @@ function App() {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/masters"
+        element={
+          <ProtectedRoute>
+            <MastersPage />
           </ProtectedRoute>
         }
       />

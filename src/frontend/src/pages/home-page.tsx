@@ -15,8 +15,11 @@ import {
   ChevronLeft, 
   ChevronRight,
   ArrowDown,
-  LayoutGrid
+  LayoutGrid,
+  Settings,
+  FolderOpen
 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 import { useAuth } from "@/features/auth"
 import { Button } from "@/components/ui/button"
@@ -32,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function HomePage() {
+  const navigate = useNavigate()
   const { signOut, user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -153,6 +157,12 @@ export function HomePage() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {user?.role === "ADMIN" && (
+                 <DropdownMenuItem onClick={() => navigate("/masters")} className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Admin Settings</span>
+                 </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => void signOut()} className="text-red-600 cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sign out</span>
@@ -162,146 +172,188 @@ export function HomePage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Page Header & Filters */}
-        <div className="flex-none px-8 py-8 space-y-4">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">All Assets</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage and organize your pre-sales collateral and case studies.</p>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar Navigation */}
+        <aside className="w-64 flex-none bg-white dark:bg-[#1e293b] border-r border-slate-200 dark:border-slate-700 flex flex-col justify-between py-6 overflow-y-auto hidden md:flex">
+          <div className="px-4 space-y-1">
+            <div className="px-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Library</div>
+            <button 
+              className="w-full group flex items-center gap-3 px-3 py-2 text-sm font-semibold text-[#137fec] bg-blue-50 dark:bg-blue-900/20 rounded-lg"
+            >
+              <FolderOpen className="h-5 w-5" />
+              All Assets
+            </button>
+            <button className="w-full group flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors">
+              <FileText className="h-5 w-5 text-slate-400 group-hover:text-slate-600" />
+              My Documents
+            </button>
+            
+            <div className="my-4 border-t border-slate-100 dark:border-slate-800"></div>
+            <div className="px-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">System</div>
+            <button 
+              onClick={() => navigate("/masters")}
+              className="w-full group flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <Settings className="h-5 w-5 text-slate-400 group-hover:text-slate-600" />
+              Masters Management
+            </button>
+          </div>
+
+          <div className="px-6 mt-auto">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4 border border-blue-100 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-tight">Storage Usage</span>
+                <span className="text-[10px] font-bold text-blue-800 dark:text-blue-300">75%</span>
+              </div>
+              <div className="w-full bg-blue-200 dark:bg-slate-700 rounded-full h-1.5 mb-2">
+                <div className="bg-[#137fec] h-1.5 rounded-full" style={{ width: '75%' }}></div>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">15GB of 20GB used</p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all h-10">
-                <Filter className="h-4 w-4" />
-                Filters
-              </Button>
-              <Button variant="outline" className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all h-10">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          {/* Page Header & Filters */}
+          <div className="flex-none px-8 py-8 space-y-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">All Assets</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage and organize your pre-sales collateral and case studies.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all h-10">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+                <Button variant="outline" className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-all h-10">
+                  <Download className="h-4 w-4" />
+                  Export
+                </Button>
+              </div>
+            </div>
+
+            {/* Active Filters Bar */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Active Filters:</span>
+              <Badge variant="secondary" className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1 gap-1.5 font-medium shadow-sm">
+                Domain: Cloud
+                <X className="h-3 w-3 cursor-pointer hover:text-red-500" />
+              </Badge>
+              <Badge variant="secondary" className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1 gap-1.5 font-medium shadow-sm">
+                Industry: Finance
+                <X className="h-3 w-3 cursor-pointer hover:text-red-500" />
+              </Badge>
+              <button className="text-xs font-bold text-[#137fec] hover:text-blue-700 ml-2">Clear All</button>
             </div>
           </div>
 
-          {/* Active Filters Bar */}
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Active Filters:</span>
-            <Badge variant="secondary" className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1 gap-1.5 font-medium shadow-sm">
-              Domain: Cloud
-              <X className="h-3 w-3 cursor-pointer hover:text-red-500" />
-            </Badge>
-            <Badge variant="secondary" className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 px-3 py-1 gap-1.5 font-medium shadow-sm">
-              Industry: Finance
-              <X className="h-3 w-3 cursor-pointer hover:text-red-500" />
-            </Badge>
-            <button className="text-xs font-bold text-[#137fec] hover:text-blue-700 ml-2">Clear All</button>
-          </div>
-        </div>
-
-        {/* Data Grid Area */}
-        <div className="flex-1 px-8 pb-8 overflow-hidden">
-          <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm h-full flex flex-col overflow-hidden">
-            {/* Table Header */}
-            <div className="overflow-x-auto flex-1">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[400px]">
-                      <div className="flex items-center gap-1 cursor-pointer hover:text-slate-700 group">
-                        Title
-                        <ArrowDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-40">Domain</th>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-40">Industry</th>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Technology</th>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-48">Customer</th>
-                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Version</th>
-                    <th className="relative px-6 py-4 w-16">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-[#1e293b] divide-y divide-slate-200 dark:divide-slate-700">
-                  {mockData.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`flex-shrink-0 size-10 rounded-lg flex items-center justify-center ${item.iconBg}`}>
-                            {item.icon}
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#137fec] transition-colors">{item.title}</div>
-                            <div className="text-[11px] text-slate-500">Updated {item.updatedAt}</div>
-                          </div>
+          {/* Data Grid Area */}
+          <div className="flex-1 px-8 pb-8 overflow-hidden">
+            <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm h-full flex flex-col overflow-hidden">
+              {/* Table Header */}
+              <div className="overflow-x-auto flex-1">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[400px]">
+                        <div className="flex items-center gap-1 cursor-pointer hover:text-slate-700 group">
+                          Title
+                          <ArrowDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium border-none px-2.5 py-0.5 rounded-full text-[11px]">
-                          {item.domain}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">{item.industry}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-wrap gap-1.5">
-                          {item.technologies.map((tech) => (
-                            <Badge key={tech} variant="outline" className="bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-800 px-2 py-0 text-[10px] font-bold">
-                              {tech}
-                            </Badge>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <div className="size-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                            {item.customer.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">{item.customer}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-[11px] text-slate-500 font-mono font-bold tracking-tight">
-                        {item.version}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 outline-none">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                      </td>
+                      </th>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-40">Domain</th>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-40">Industry</th>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Technology</th>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-48">Customer</th>
+                      <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider w-24">Version</th>
+                      <th className="relative px-6 py-4 w-16">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white dark:bg-[#1e293b] divide-y divide-slate-200 dark:divide-slate-700">
+                    {mockData.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className={`flex-shrink-0 size-10 rounded-lg flex items-center justify-center ${item.iconBg}`}>
+                              {item.icon}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#137fec] transition-colors">{item.title}</div>
+                              <div className="text-[11px] text-slate-500">Updated {item.updatedAt}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium border-none px-2.5 py-0.5 rounded-full text-[11px]">
+                            {item.domain}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">{item.industry}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.technologies.map((tech) => (
+                              <Badge key={tech} variant="outline" className="bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-800 px-2 py-0 text-[10px] font-bold">
+                                {tech}
+                              </Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="size-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                              {item.customer.split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">{item.customer}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-[11px] text-slate-500 font-mono font-bold tracking-tight">
+                          {item.version}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 outline-none">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* Pagination */}
-            <div className="bg-white dark:bg-[#1e293b] px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Showing <span className="font-bold text-slate-900 dark:text-slate-200">1</span> to <span className="font-bold text-slate-900 dark:text-slate-200">5</span> of <span className="font-bold text-slate-900 dark:text-slate-200">97</span> results
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <nav aria-label="Pagination" className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-l-md border-slate-300 dark:border-slate-600 text-slate-500">
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button className="h-8 w-8 bg-blue-50 dark:bg-blue-900 border-[#137fec] text-[#137fec] rounded-none hover:bg-blue-100 dark:hover:bg-blue-800">1</Button>
-                    <Button variant="outline" className="h-8 w-8 rounded-none border-slate-300 dark:border-slate-600 text-slate-500">2</Button>
-                    <Button variant="outline" className="h-8 w-8 rounded-none border-slate-300 dark:border-slate-600 text-slate-500 hidden md:inline-flex">3</Button>
-                    <span className="relative inline-flex items-center px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-400">...</span>
-                    <Button variant="outline" size="icon" className="h-8 w-8 rounded-r-md border-slate-300 dark:border-slate-600 text-slate-500">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </nav>
+              {/* Pagination */}
+              <div className="bg-white dark:bg-[#1e293b] px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Showing <span className="font-bold text-slate-900 dark:text-slate-200">1</span> to <span className="font-bold text-slate-900 dark:text-slate-200">5</span> of <span className="font-bold text-slate-900 dark:text-slate-200">97</span> results
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <nav aria-label="Pagination" className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-l-md border-slate-300 dark:border-slate-600 text-slate-500">
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button className="h-8 w-8 bg-blue-50 dark:bg-blue-900 border-[#137fec] text-[#137fec] rounded-none hover:bg-blue-100 dark:hover:bg-blue-800">1</Button>
+                      <Button variant="outline" className="h-8 w-8 rounded-none border-slate-300 dark:border-slate-600 text-slate-500">2</Button>
+                      <Button variant="outline" className="h-8 w-8 rounded-none border-slate-300 dark:border-slate-600 text-slate-500 hidden md:inline-flex">3</Button>
+                      <span className="relative inline-flex items-center px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-400">...</span>
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-r-md border-slate-300 dark:border-slate-600 text-slate-500">
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </nav>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
