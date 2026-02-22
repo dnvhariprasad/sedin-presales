@@ -1,20 +1,19 @@
 import { useState, useEffect } from "react"
-import { 
-  Search, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Grid, 
-  Database, 
-  Factory, 
-  Code, 
-  Settings, 
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
+  Grid,
+  Database,
+  Factory,
+  Code,
+  Settings,
   LayoutGrid,
   MoreVertical,
   CheckCircle2,
   AlertCircle
 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 import { useAuth } from "@/features/auth"
@@ -48,7 +47,6 @@ interface MasterCategory {
 }
 
 export function MastersPage() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [activeCategory, setActiveCategory] = useState("domains")
   const [items, setItems] = useState<MasterItem[]>([])
@@ -156,11 +154,11 @@ export function MastersPage() {
     setIsDeleteOpen(true)
   }
 
-  const filteredCategories = categories.filter(c => 
+  const filteredCategories = categories.filter(c =>
     c.name.toLowerCase().includes(catSearch.toLowerCase())
   )
 
-  const filteredItems = items.filter(item => 
+  const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
   )
@@ -168,48 +166,22 @@ export function MastersPage() {
   const currentCategoryName = categories.find(c => c.id === activeCategory)?.name
 
   return (
-    <div className="flex h-screen w-full flex-col bg-[#f8fafc] dark:bg-[#101922] font-sans">
-      {/* Header */}
-      <header className="flex-none h-16 bg-white dark:bg-[#1e293b] border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 z-20">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/")}>
-          <div className="size-9 bg-[#137fec]/10 rounded-lg flex items-center justify-center text-[#137fec]">
-            <LayoutGrid className="h-5 w-5" />
-          </div>
-          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">Asset Manager</h1>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="text-[#137fec] border-[#137fec]/20 bg-[#137fec]/5 font-bold uppercase tracking-widest text-[10px]">
-            Admin Portal
-          </Badge>
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
-          <div className="flex items-center gap-3">
-             <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">{user?.displayName}</p>
-                <p className="text-[10px] text-slate-500 font-medium">{user?.role}</p>
-             </div>
-             <div className="size-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold border border-slate-200 dark:border-slate-700">
-                {user?.displayName?.charAt(0)}
-             </div>
-          </div>
-        </div>
-      </header>
-
+    <>
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Categories */}
+        {/* Page-specific Categories Sidebar */}
         <aside className="w-72 flex-none bg-white dark:bg-[#1e293b]/50 border-r border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-700">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                className="pl-9 h-9 text-xs" 
-                placeholder="Filter categories..." 
+              <Input
+                className="pl-9 h-9 text-xs"
+                placeholder="Filter categories..."
                 value={catSearch}
                 onChange={(e) => setCatSearch(e.target.value)}
               />
             </div>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
             <p className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Lists</p>
             {filteredCategories.map((cat) => (
@@ -217,8 +189,8 @@ export function MastersPage() {
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-between group transition-all ${
-                  activeCategory === cat.id 
-                  ? "bg-[#137fec]/10 text-[#137fec]" 
+                  activeCategory === cat.id
+                  ? "bg-[#137fec]/10 text-[#137fec]"
                   : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
                 }`}
               >
@@ -232,7 +204,7 @@ export function MastersPage() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] dark:bg-[#101922] p-8 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] dark:bg-[#101922] p-8 overflow-hidden">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Masters Management</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">Configure global categories and lookup values.</p>
@@ -247,19 +219,19 @@ export function MastersPage() {
                   {items.length} Entries
                 </Badge>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input 
-                    className="pl-9 h-10 w-64 bg-white dark:bg-slate-900" 
-                    placeholder="Search values..." 
+                  <Input
+                    className="pl-9 h-10 w-64 bg-white dark:bg-slate-900"
+                    placeholder="Search values..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
                 {user?.role === "ADMIN" && (
-                  <Button 
+                  <Button
                     onClick={() => {
                       setFormData({ name: "", description: "" })
                       setIsCreateOpen(true)
@@ -316,17 +288,17 @@ export function MastersPage() {
                         {user?.role === "ADMIN" && (
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => openEditDialog(item)}
                                 className="h-8 w-8 text-slate-400 hover:text-[#137fec]"
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => openDeleteDialog(item)}
                                 className="h-8 w-8 text-slate-400 hover:text-red-500"
                               >
@@ -351,7 +323,7 @@ export function MastersPage() {
               </table>
             </div>
           </div>
-        </main>
+        </div>
       </div>
 
       {/* Create Dialog */}
@@ -454,9 +426,9 @@ export function MastersPage() {
             <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              type="button" 
-              variant="destructive" 
+            <Button
+              type="button"
+              variant="destructive"
               onClick={handleDelete}
               disabled={actionLoading}
             >
@@ -465,6 +437,6 @@ export function MastersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
